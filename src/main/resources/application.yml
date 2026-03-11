@@ -1,0 +1,27 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:guardian
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+  h2:
+    console:
+      enabled: true
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+
+guardian:
+  security:
+    jwt:
+      secret: "guardian-super-secret-key-2026-secure"
+      expiration: 3600000
