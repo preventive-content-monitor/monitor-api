@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/auth")
 @Tag(name = "Autenticação", description = "Endpoints de autenticação e registro de usuários")
 class AuthController(
-    private val authService: AuthService
+    private val authenticationService: AuthenticationService
 ) {
 
     @PostMapping("/register")
@@ -45,7 +45,7 @@ class AuthController(
         ]
     )
     fun register(@RequestBody request: RegisterRequest) {
-        authService.register(request)
+        authenticationService.register(request)
     }
 
     @PostMapping("/login")
@@ -68,6 +68,6 @@ class AuthController(
         ]
     )
     fun login(@RequestBody request: LoginRequest): AuthResponse {
-        return authService.login(request)
+        return authenticationService.login(request)
     }
 }
