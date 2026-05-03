@@ -2,6 +2,7 @@ package br.com.guardian.backend.adaptadores.entrada.rest
 
 import br.com.guardian.backend.adaptadores.entrada.dto.RespostaErro
 import br.com.guardian.backend.adaptadores.entrada.dto.RequisicaoAtualizarPolitica
+import br.com.guardian.backend.adaptadores.entrada.dto.RespostaPolitica
 import br.com.guardian.backend.aplicacao.porta.entrada.ServicoPolitica
 import br.com.guardian.backend.dominio.modelo.Politica
 import io.swagger.v3.oas.annotations.Operation
@@ -33,7 +34,7 @@ class PoliticaController(
             ApiResponse(
                 responseCode = "200",
                 description = "Política retornada com sucesso",
-                content = [Content(schema = Schema(implementation = Politica::class))]
+                content = [Content(schema = Schema(implementation = RespostaPolitica::class))]
             ),
             ApiResponse(
                 responseCode = "401",
@@ -50,8 +51,9 @@ class PoliticaController(
     fun buscarAtual(
         @Parameter(description = "ID do dispositivo", required = true)
         @RequestParam dispositivoId: UUID
-    ): Politica {
-        return servicoPolitica.buscarPoliticaPorDispositivo(dispositivoId)
+    ): RespostaPolitica {
+        val politica = servicoPolitica.buscarPoliticaPorDispositivo(dispositivoId)
+        return politica.paraResposta()
     }
 
     @PutMapping
@@ -64,7 +66,7 @@ class PoliticaController(
             ApiResponse(
                 responseCode = "200",
                 description = "Política atualizada com sucesso",
-                content = [Content(schema = Schema(implementation = Politica::class))]
+                content = [Content(schema = Schema(implementation = RespostaPolitica::class))]
             ),
             ApiResponse(
                 responseCode = "400",
@@ -87,8 +89,8 @@ class PoliticaController(
         @Parameter(description = "ID do dispositivo", required = true)
         @RequestParam dispositivoId: UUID,
         @RequestBody requisicao: RequisicaoAtualizarPolitica
-    ): Politica {
-        return servicoPolitica.atualizarPolitica(
+    ): RespostaPolitica {
+        val politica = servicoPolitica.atualizarPolitica(
             dispositivoId = dispositivoId,
             modo = requisicao.modo,
             limiteRisco = requisicao.limiteRisco,
@@ -97,6 +99,24 @@ class PoliticaController(
             modoEscolaAtivo = requisicao.modoEscolaAtivo,
             escolaInicio = requisicao.escolaInicio,
             escolaFim = requisicao.escolaFim
+        )
+        return politica.paraResposta()
+    }
+
+    private fun Politica.paraResposta(): RespostaPolitica {
+        return RespostaPolitica(
+            id = id,
+            dependenteId = dependente.id,
+            nomeDependente = dependente.apelido,
+            anoNascimentoDependente = dependente.anoNascimento,
+            modo = modo,
+            limiteRisco = limiteRisco,
+            dominiosBloqueados = dominiosBloqueados,
+            dominiosPermitidos = dominiosPermitidos,
+            modoEscolaAtivo = modoEscolaAtivo,
+            escolaInicio = escolaInicio,
+            escolaFim = escolaFim,
+            criadoEm = criadoEm
         )
     }
 }
