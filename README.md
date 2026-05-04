@@ -239,6 +239,8 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
   "usuarioGuardian": { "id": "uuid", "email": "string" },
   "apelido": "string",
   "anoNascimento": 2015,
+  "dataNascimento": "2015-09-21",
+  "sexo": "MASCULINO | FEMININO",
   "criadoEm": "2026-02-22T10:00:00Z"
 }
 ```

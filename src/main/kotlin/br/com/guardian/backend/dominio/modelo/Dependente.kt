@@ -2,6 +2,7 @@ package br.com.guardian.backend.dominio.modelo
 
 import jakarta.persistence.*
 import java.time.Instant
+import java.time.LocalDate
 import java.util.*
 
 @Entity
@@ -20,6 +21,13 @@ class Dependente(
 
     @Column(name = "ano_nascimento", nullable = false)
     val anoNascimento: Int,
+
+    @Column(name = "data_nascimento")
+    val dataNascimento: LocalDate? = null,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sexo", length = 10)
+    val sexo: SexoDependente? = null,
 
     @Column(name = "criado_em", nullable = false)
     val criadoEm: Instant = Instant.now()

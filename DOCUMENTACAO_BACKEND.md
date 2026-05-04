@@ -194,7 +194,8 @@ Cria um dependente vinculado ao responsável autenticado.
 ```json
 {
   "apelido": "João",
-  "anoNascimento": 2015
+  "dataNascimento": "2015-09-21",
+  "sexo": "MASCULINO"
 }
 ```
 
@@ -204,6 +205,8 @@ Cria um dependente vinculado ao responsável autenticado.
   "id": "uuid",
   "apelido": "João",
   "anoNascimento": 2015,
+  "dataNascimento": "2015-09-21",
+  "sexo": "MASCULINO",
   "criadoEm": "2026-05-03T00:00:00Z"
 }
 ```

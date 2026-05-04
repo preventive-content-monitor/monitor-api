@@ -210,8 +210,9 @@ Authorization: Bearer <token>
 **Request:**
 ```json
 {
-  "nickname": "João",
-  "birthYear": 2015
+  "apelido": "João",
+  "dataNascimento": "2015-09-21",
+  "sexo": "MASCULINO"
 }
 ```
 
@@ -223,8 +224,10 @@ Authorization: Bearer <token>
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "email": "pai@familia.com"
   },
-  "nickname": "João",
-  "birthYear": 2015,
+  "apelido": "João",
+  "anoNascimento": 2015,
+  "dataNascimento": "2015-09-21",
+  "sexo": "MASCULINO",
   "createdAt": "2026-02-22T10:00:00Z"
 }
 ```
@@ -244,9 +247,11 @@ Authorization: Bearer <token>
 [
   {
     "id": "550e8400-e29b-41d4-a716-446655440000",
-    "nickname": "João",
-    "birthYear": 2015,
-    "createdAt": "2026-02-22T10:00:00Z"
+    "apelido": "João",
+    "anoNascimento": 2015,
+    "dataNascimento": "2015-09-21",
+    "sexo": "MASCULINO",
+    "criadoEm": "2026-02-22T10:00:00Z"
   }
 ]
 ```

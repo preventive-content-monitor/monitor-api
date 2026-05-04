@@ -52,7 +52,9 @@ class DependenteController(
         val dependente = Dependente(
             usuarioGuardian = usuario,
             apelido = requisicao.apelido,
-            anoNascimento = requisicao.anoNascimento
+            anoNascimento = requisicao.dataNascimento.year,
+            dataNascimento = requisicao.dataNascimento,
+            sexo = requisicao.sexo
         )
         return dependenteRepositorio.save(dependente)
     }

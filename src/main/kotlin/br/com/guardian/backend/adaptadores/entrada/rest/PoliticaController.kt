@@ -109,6 +109,8 @@ class PoliticaController(
             dependenteId = dependente.id,
             nomeDependente = dependente.apelido,
             anoNascimentoDependente = dependente.anoNascimento,
+            dataNascimentoDependente = dependente.dataNascimento,
+            sexoDependente = dependente.sexo,
             modo = modo,
             limiteRisco = limiteRisco,
             dominiosBloqueados = dominiosBloqueados,
