@@ -184,11 +184,70 @@ HTTP Request
 
 ---
 
-## Base URL
+---
+
+## Deploy em Produção (AWS)
+
+O backend é executado em uma EC2 `t3.micro` com Amazon Linux 2023, provisionada via Terraform.
+
+### Infraestrutura
+
+| Componente | Detalhes |
+|------------|---------|
+| **EC2** | t3.micro, Amazon Linux 2023, `LabInstanceProfile` |
+| **nginx** | Porta 80 — serve o dashboard e faz proxy `/api/` → `:8080` |
+| **Spring Boot** | Porta 8080 (interno), gerenciado pelo systemd (`guardian.service`) |
+| **RDS** | MySQL 8.0, subnet privada, acesso apenas via VPC |
+| **JAR** | Armazenado em `s3://guardian-logs-<account>/app/backend.jar` |
+
+### URL de Produção
 
 ```
-http://localhost:8080
+http://<EC2-IP>/api          ← Elastic IP atribuído pelo Terraform
 ```
+
+Obtenha com: `terraform output backend_api_url`
+
+### Variáveis de Ambiente (systemd)
+
+| Variável | Fonte |
+|----------|-------|
+| `DB_URL` | JDBC URL do RDS MySQL (injetada pelo `ec2_userdata.sh`) |
+| `DB_USERNAME` | Usuário master do RDS |
+| `DB_PASSWORD` | Senha do RDS |
+| `JWT` | Segredo para assinar tokens JWT |
+
+### Build e Deploy
+
+```powershell
+# 1. Build do JAR
+cd monitor-api
+./mvnw clean package -DskipTests
+
+# 2. Upload para S3
+aws s3 cp target/backend-0.1.0.jar s3://guardian-logs-750476866422/app/backend.jar
+
+# 3. Aplicar infraestrutura (EC2 baixa o JAR automaticamente via userdata)
+cd ../terraform
+terraform apply
+```
+
+### Integração com Lambda Classificadora
+
+O backend **não classifica eventos diretamente**. A classificação de URLs é feita pela Lambda `guardian-classificador` (Python 3.12 + OpenAI gpt-4o-mini), que:
+1. Consome eventos do SQS (`guardian-eventos`)
+2. Classifica via OpenAI com cache 24h e pré-filtro local
+3. Persiste o resultado diretamente no RDS MySQL via PyMySQL
+
+O `ClienteClassificador.kt` no Spring Boot existe para casos de classificação síncrona, mas o fluxo principal é assíncrono via Lambda.
+
+---
+
+## Base URL
+
+**Produção:** `http://<EC2-IP>/api` (ver `terraform output backend_api_url`)
+
+**Desenvolvimento local:** `http://localhost:8080`
 
 ---
 

@@ -15,7 +15,9 @@ class ConfiguracaoCors {
                 registry.addMapping("/**")
                     .allowedOriginPatterns(
                         "http://localhost:*",
-                        "chrome-extension://*"  // Extensões Chrome
+                        "http://127.0.0.1:*",
+                        "http://*",          // EC2 public IP/DNS (dinamico)
+                        "chrome-extension://*"
                     )
                     .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                     .allowedHeaders("*")

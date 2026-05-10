@@ -8,14 +8,18 @@
 
 | Item | Valor |
 |------|-------|
-| Linguagem | Kotlin |
-| Framework | Spring Boot |
-| Banco de Dados | MySQL |
+| Linguagem | Kotlin 1.9.24 |
+| Framework | Spring Boot 3.2.5 |
+| Banco de Dados | **AWS RDS MySQL 8.0** (subnet privada, VPC only) |
 | Autenticação | JWT (Bearer Token) |
-| Porta padrão | `8080` |
-| Base URL | `http://localhost:8080` |
-| Documentação Swagger | `http://localhost:8080/swagger-ui/index.html` |
-| OpenAPI JSON | `http://localhost:8080/v3/api-docs` |
+| Porta interna | `8080` |
+| Acesso externo | `http://<EC2-IP>/api` (nginx reverse proxy) |
+| Documentação Swagger | `http://<EC2-IP>/api/swagger-ui/index.html` |
+| OpenAPI JSON | `http://<EC2-IP>/api/v3/api-docs` |
+
+> O IP da EC2 é atribuído via Elastic IP pelo Terraform. Obtenha com: `terraform output ec2_public_ip`
+>
+> **Desenvolvimento local:** `http://localhost:8080` (requer banco MySQL local ou túnel SSH para o RDS)
 
 ---
 

@@ -1,49 +1,125 @@
-# Guardian Backend - Documentação Completa para Integração
+# Guardian Backend — Documentação de Integração
 
 ## Visão Geral
 
-O **Guardian** é um sistema de controle parental que monitora e classifica a navegação de crianças e adolescentes. Este backend fornece APIs REST para:
+O **GuardIAn** é uma plataforma de controle parental que monitora e classifica a navegação de crianças e adolescentes com IA. Este backend fornece APIs REST para:
 
 - Autenticação de responsáveis (pais/tutores)
 - Gerenciamento de dependentes (crianças monitoradas)
 - Vinculação de dispositivos
 - Ingestão de eventos de navegação
-- Classificação automática de conteúdo
+- Classificação automática de conteúdo via IA
 - Aplicação de políticas de bloqueio
 - Métricas e dashboard
 
 ---
 
-## Arquitetura
+## Arquitetura Real (Produção)
 
 ```
-┌─────────────────────┐     ┌──────────────────────┐
-│  Extensão Browser   │────▶│   Guardian Backend   │
-│  (Chrome/Firefox)   │     │   (Spring Boot)      │
-└─────────────────────┘     └──────────────────────┘
-                                      │
-                            ┌─────────┴─────────┐
-                            ▼                   ▼
-                    ┌──────────────┐    ┌──────────────┐
-                    │   Database   │    │  Classifier  │
-                    │     (H2)     │    │   (Mock/ML)  │
-                    └──────────────┘    └──────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  Chrome do Dependente                                           │
+│  ┌──────────────────────┐                                       │
+│  │  Extensão Chrome MV3 │ POST /events/batch                    │
+│  │  (monitor-extension) │─────────────────────────────────────► │
+│  └──────────────────────┘                                       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+              ┌─────────────────────────────┐
+              │   API Gateway (REST API)    │  ← sem autenticação
+              │   POST /events/batch        │
+              └──────────────┬──────────────┘
+                             │ Integração direta (sem Lambda)
+                             ▼
+              ┌─────────────────────────────┐
+              │   SQS — guardian-eventos    │
+              │   DLQ após 3 falhas         │
+              └──────────────┬──────────────┘
+                             │ Trigger (batch até 10)
+                             ▼
+              ┌─────────────────────────────┐
+              │   Lambda — guardian-        │
+              │   classificador             │
+              │   Python 3.12 / 512 MB      │
+              └──────┬───────────┬──────────┘
+                     │           │
+           ┌─────────▼──┐  ┌────▼────────────────┐
+           │  OpenAI    │  │  RDS MySQL 8.0       │
+           │ gpt-4o-mini│  │  (subnet privada)    │
+           └────────────┘  └────────┬─────────────┘
+                                    │ risco alto?
+                                    ▼
+                        ┌────────────────────────┐
+                        │  SNS — guardian-alertas│
+                        │  e-mail ao responsável  │
+                        └────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Chrome do Responsável                                          │
+│  http://<EC2-IP>   (dashboard servido pelo nginx)              │
+│  ┌──────────────┐      ┌────────────────────────────────────┐  │
+│  │  Dashboard   │◄────►│  EC2 t3.micro / Amazon Linux 2023  │  │
+│  │  HTML/CSS/JS │      │  ┌──────────┐  ┌───────────────┐   │  │
+│  └──────────────┘      │  │  nginx   │  │ Spring Boot   │   │  │
+│                        │  │  :80     │  │ :8080 /api    │   │  │
+│                        │  └──────────┘  └───────┬───────┘   │  │
+│                        └──────────────────────── ┼ ──────────┘  │
+└──────────────────────────────────────────────── ┼ ─────────────┘
+                                                  │
+                                                  ▼
+                              ┌────────────────────────────┐
+                              │  RDS MySQL 8.0             │
+                              │  (subnet privada, VPC only)│
+                              └────────────────────────────┘
 ```
 
 ### Stack Tecnológica
-- **Framework**: Spring Boot 3.2.5
-- **Linguagem**: Kotlin 1.9
-- **Autenticação**: JWT (Bearer Token)
-- **Database**: H2 (dev) / MySQL (prod)
-- **Documentação**: OpenAPI 3 (Swagger)
+
+| Camada | Tecnologia |
+|--------|-----------|
+| Framework | Spring Boot 3.2.5 |
+| Linguagem | Kotlin 1.9.24 / Java 17 |
+| Autenticação | JWT Bearer Token |
+| Banco de Dados | **AWS RDS MySQL 8.0** (nunca H2 em produção) |
+| Classificador IA | **AWS Lambda** `guardian-classificador` (Python 3.12 + OpenAI gpt-4o-mini) |
+| Ingestão de eventos | **API Gateway → SQS → Lambda** (assíncrono) |
+| Alertas | AWS SNS (e-mail ao responsável) |
+| Documentação | OpenAPI 3 / Swagger UI |
 
 ---
 
-## Base URL
+## URLs de Produção
+
+> O IP da EC2 é atribuído via Elastic IP pelo Terraform. Obtenha com `terraform output ec2_public_ip`.
+
+| Serviço | URL |
+|---------|-----|
+| **Backend API (Spring Boot)** | `http://<EC2-IP>/api` |
+| **Dashboard (nginx)** | `http://<EC2-IP>` |
+| **Envio de eventos (API Gateway)** | `https://2o9ybf5asf.execute-api.us-east-1.amazonaws.com/prod` |
+| **Swagger UI** | `http://<EC2-IP>/api/swagger-ui/index.html` |
+| **OpenAPI JSON** | `http://<EC2-IP>/api/v3/api-docs` |
+
+> Nota: `POST /events/batch` do lado da extensão aponta para a URL do **API Gateway**, não para o Spring Boot diretamente. O Spring Boot recebe os eventos já processados da Lambda.
+
+---
+
+## Fluxo de Ingestão de Eventos (Assíncrono)
+
+A extensão **não** envia eventos diretamente ao Spring Boot. O fluxo real é:
 
 ```
-http://localhost:8080
+Extensão  →  API Gateway /events/batch  →  SQS  →  Lambda  →  RDS
 ```
+
+1. A extensão faz `POST` para o **API Gateway** (sem autenticação)
+2. O API Gateway enfileira a mensagem no **SQS** (`guardian-eventos`) diretamente
+3. O **Lambda** `guardian-classificador` é triggerado em batch (até 10 mensagens)
+4. A Lambda classifica cada URL com OpenAI gpt-4o-mini (com cache 24h e pré-filtro local)
+5. A Lambda persiste o resultado em `classificacoes` no **RDS MySQL**
+6. Se risco ≥ limiar e modo=`BLOCK`: adiciona domínio à lista bloqueada na política
+7. Se modo=`WARN` e risco ≥ limiar: publica alerta no **SNS** (e-mail ao responsável)
 
 ---
 
@@ -58,9 +134,10 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ### Endpoints Públicos (sem autenticação)
 - `POST /api/auth/register`
 - `POST /api/auth/login`
-- `POST /api/events/batch`
 - `POST /api/devices/enroll`
 - `GET /api/policy/current`
+
+> **Atenção:** `POST /events/batch` é enviado ao **API Gateway**, não ao Spring Boot diretamente. Ver seção "Fluxo de Ingestão de Eventos".
 
 ### Endpoints Protegidos (requer JWT)
 - `GET /api/dependents`
@@ -312,8 +389,13 @@ Vincula dispositivo usando o código. **Endpoint público (sem autenticação) -
 
 ### 4. Eventos (Ingestão)
 
-#### POST /api/events/batch
+#### POST /events/batch — via API Gateway
 **ENDPOINT PRINCIPAL PARA A EXTENSÃO**
+
+> **URL completa:** `https://2o9ybf5asf.execute-api.us-east-1.amazonaws.com/prod/events/batch`
+>
+> Este endpoint pertence ao **API Gateway**, não ao Spring Boot. A extensão envia eventos aqui.
+> O API Gateway encaminha para o SQS → Lambda → RDS (fluxo assíncrono). Não há resposta com resultado de classificação imediata.
 
 Envia lote de eventos de navegação. **Não requer autenticação** (apenas deviceId válido).
 
@@ -343,29 +425,19 @@ Envia lote de eventos de navegação. **Não requer autenticação** (apenas dev
 }
 ```
 
-**Response:** `200 OK`
+**Response:** `200 OK` (confirmação de enfileiramento no SQS)
 ```json
 {
-  "status": "ok",
-  "ingested": 2
+  "SendMessageResponse": { ... }
 }
 ```
 
-**Erros:**
-| Status | Descrição |
-|--------|-----------|
-| 404 | Dispositivo não encontrado |
-| 400 | Dados inválidos |
-
-**Comportamento interno:**
-1. Valida se o `deviceId` existe
-2. Para cada evento:
-   - Extrai host e hash do path da URL
-   - Salva evento no banco
-   - Classifica conteúdo (riskScore 0-100)
-   - Verifica política de bloqueio
-3. Atualiza `lastSeenAt` do dispositivo
-4. Retorna contagem de eventos processados
+**Processamento assíncrono (Lambda):**
+1. Lambda `guardian-classificador` consome o batch do SQS
+2. Classifica cada URL com OpenAI gpt-4o-mini (4 camadas: cache → pré-filtro → OpenAI → fallback)
+3. Persiste resultado em `classificacoes` no RDS
+4. Se modo=`BLOCK` e risco ≥ limiar → adiciona domínio a `politicas.dominios_bloqueados`
+5. Se modo=`WARN` e risco ≥ limiar → publica no SNS (e-mail ao responsável)
 
 ---
 

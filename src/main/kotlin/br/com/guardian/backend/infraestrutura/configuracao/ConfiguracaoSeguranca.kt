@@ -78,6 +78,7 @@ class ConfiguracaoSeguranca {
         configuracao.allowedOriginPatterns = listOf(
             "http://localhost:*",
             "http://127.0.0.1:*",
+            "http://*",          // EC2 public IP/DNS (dinamico)
             "chrome-extension://*",
             "moz-extension://*"
         )
