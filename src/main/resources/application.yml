@@ -32,3 +32,6 @@ guardian:
     jwt:
       secret: ${JWT:guardian-super-secret-key-2026-secure}
       expiration: 3600000
+
+openai:
+  api-key: ${OPENAI_API_KEY:}

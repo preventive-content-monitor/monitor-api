@@ -24,6 +24,9 @@ class ResultadoClassificacao(
     @Column(name = "pontuacao_risco", nullable = false)
     val pontuacaoRisco: Int,
 
+    @Column(name = "url_host", length = 255)
+    val urlHost: String? = null,
+
     @Lob
     @Column(name = "justificativa")
     val justificativa: String? = null,

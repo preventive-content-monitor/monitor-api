@@ -27,10 +27,10 @@ class ServicoIngestaoEvento(
         val dispositivo = dispositivoRepositorio.findById(requisicao.dispositivoId)
             .orElseThrow { DispositivoNaoEncontradoExcecao() }
 
-        val entidades = requisicao.eventos.map { dto ->
+        val pares: List<Pair<String, Evento>> = requisicao.eventos.map { dto ->
             val (host, pathHash) = extrairHostEPathHash(dto.url)
 
-            Evento(
+            dto.url to Evento(
                 dispositivo = dispositivo,
                 tipo = dto.tipo,
                 urlHost = host,
@@ -41,10 +41,11 @@ class ServicoIngestaoEvento(
             )
         }
 
-        val salvos = eventoRepositorio.saveAll(entidades)
+        val salvos = eventoRepositorio.saveAll(pares.map { it.second })
 
-        salvos.forEach { evento ->
-            val classificacao = servicoClassificacao.classificar(evento)
+        salvos.forEachIndexed { idx, evento ->
+            val urlOriginal = pares[idx].first
+            val classificacao = servicoClassificacao.classificar(evento, urlOriginal)
 
             val deveBloquear = servicoPolitica.deveBloquear(
                 dominio = evento.urlHost,
