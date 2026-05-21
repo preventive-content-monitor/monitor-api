@@ -1,10 +1,12 @@
 package br.com.guardian.backend.dominio.modelo
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import jakarta.persistence.*
 import java.time.Instant
 import java.time.LocalDate
 import java.util.*
 
+@JsonIgnoreProperties("hibernateLazyInitializer", "handler")
 @Entity
 @Table(name = "dependentes")
 class Dependente(

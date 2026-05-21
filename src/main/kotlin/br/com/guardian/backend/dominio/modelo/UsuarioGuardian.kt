@@ -1,9 +1,11 @@
 package br.com.guardian.backend.dominio.modelo
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import jakarta.persistence.*
 import java.time.Instant
 import java.util.*
 
+@JsonIgnoreProperties("hibernateLazyInitializer", "handler")
 @Entity
 @Table(name = "usuarios_guardian")
 class UsuarioGuardian(
