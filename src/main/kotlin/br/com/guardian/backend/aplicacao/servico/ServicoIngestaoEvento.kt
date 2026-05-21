@@ -54,7 +54,7 @@ class ServicoIngestaoEvento(
             )
 
             if (deveBloquear) {
-                println("⚠ BLOQUEAR: ${evento.urlHost} score=${classificacao.pontuacaoRisco}")
+                servicoPolitica.adicionarDominioBloqueado(evento.urlHost, dispositivo.id)
             }
         }
 

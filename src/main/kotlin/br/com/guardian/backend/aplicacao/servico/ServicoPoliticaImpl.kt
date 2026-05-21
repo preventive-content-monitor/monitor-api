@@ -85,4 +85,20 @@ class ServicoPoliticaImpl(
 
         return pontuacaoRisco >= politica.limiteRisco && politica.modo == ModoPolitica.BLOCK
     }
+
+    override fun adicionarDominioBloqueado(dominio: String, dispositivoId: UUID) {
+        val politica = buscarPoliticaPorDispositivo(dispositivoId)
+
+        if (politica.modo != ModoPolitica.BLOCK) return
+
+        val lista: MutableList<String> = serializadorJson
+            .desserializarLista(politica.dominiosBloqueados, String::class.java)
+            .toMutableList()
+
+        if (lista.contains(dominio)) return
+
+        lista.add(dominio)
+        politica.dominiosBloqueados = serializadorJson.serializar(lista)
+        politicaRepositorio.save(politica)
+    }
 }

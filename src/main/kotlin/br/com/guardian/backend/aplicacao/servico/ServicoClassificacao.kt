@@ -5,6 +5,7 @@ import br.com.guardian.backend.adaptadores.saida.persistencia.ClassificacaoRepos
 import br.com.guardian.backend.dominio.modelo.Evento
 import br.com.guardian.backend.dominio.modelo.ResultadoClassificacao
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import java.time.Duration
 import java.time.Instant
@@ -22,16 +23,17 @@ class ServicoClassificacao(
 
     fun classificar(evento: Evento, urlCompleta: String): ResultadoClassificacao {
         val desde = Instant.now().minus(CACHE_TTL)
-        val cacheHit = classificacaoRepositorio.findPrimeiraRecente(evento.urlHost, desde)
+        val cacheHit = classificacaoRepositorio.findPrimeiraRecente(evento.urlHost, desde, PageRequest.of(0, 1)).firstOrNull()
 
         if (cacheHit != null) {
             logger.info("[Cache HIT] host={} rotulo={} score={}", evento.urlHost, cacheHit.rotulo, cacheHit.pontuacaoRisco)
+            val modeloBase = cacheHit.modelo.removeSuffix("-cached")
             // Cria registro para este evento com valores do cache
             return classificacaoRepositorio.save(
                 ResultadoClassificacao(
                     evento = evento,
                     urlHost = evento.urlHost,
-                    modelo = cacheHit.modelo + "-cached",
+                    modelo = "$modeloBase-cached",
                     rotulo = cacheHit.rotulo,
                     pontuacaoRisco = cacheHit.pontuacaoRisco,
                     justificativa = cacheHit.justificativa

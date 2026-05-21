@@ -1,6 +1,7 @@
 package br.com.guardian.backend.adaptadores.saida.persistencia
 
 import br.com.guardian.backend.dominio.modelo.ResultadoClassificacao
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -17,6 +18,7 @@ interface ClassificacaoRepositorio : JpaRepository<ResultadoClassificacao, UUID>
     )
     fun findPrimeiraRecente(
         @Param("host") host: String,
-        @Param("desde") desde: Instant
-    ): ResultadoClassificacao?
+        @Param("desde") desde: Instant,
+        pageable: Pageable
+    ): List<ResultadoClassificacao>
 }
