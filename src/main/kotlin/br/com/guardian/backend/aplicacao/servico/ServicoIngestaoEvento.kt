@@ -19,7 +19,8 @@ class ServicoIngestaoEvento(
     private val objectMapper: ObjectMapper,
     private val servicoClassificacao: ServicoClassificacao,
     private val servicoPolitica: ServicoPolitica,
-    private val servicoVulnerabilidade: ServicoVulnerabilidade
+    private val servicoVulnerabilidade: ServicoVulnerabilidade,
+    private val servicoBlocklistS3: ServicoBlocklistS3
 ) {
 
     fun ingerirLote(requisicao: RequisicaoIngestaoLoteEvento): Int {
@@ -55,6 +56,13 @@ class ServicoIngestaoEvento(
 
             if (deveBloquear) {
                 servicoPolitica.adicionarDominioBloqueado(evento.urlHost, dispositivo.id)
+            }
+
+            // S3 blacklist é baseado na pontuação de risco da IA (independe do modo de política)
+            if (classificacao.pontuacaoRisco >= 70) {
+                servicoBlocklistS3.adicionarAoBlacklist(evento.urlHost)
+            } else if (classificacao.rotulo == "SAFE") {
+                servicoBlocklistS3.adicionarAoWhitelist(evento.urlHost)
             }
         }
 
