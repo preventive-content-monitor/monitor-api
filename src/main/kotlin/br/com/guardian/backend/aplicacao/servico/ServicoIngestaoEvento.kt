@@ -58,8 +58,8 @@ class ServicoIngestaoEvento(
                 servicoPolitica.adicionarDominioBloqueado(evento.urlHost, dispositivo.id)
             }
 
-            // S3 blacklist é baseado na pontuação de risco da IA (independe do modo de política)
-            if (classificacao.pontuacaoRisco >= 70) {
+            // S3 blacklist: sites com risco alto OU qualquer site que a política individual bloqueou
+            if (classificacao.pontuacaoRisco >= 70 || deveBloquear) {
                 servicoBlocklistS3.adicionarAoBlacklist(evento.urlHost)
             } else if (classificacao.rotulo == "SAFE") {
                 servicoBlocklistS3.adicionarAoWhitelist(evento.urlHost)

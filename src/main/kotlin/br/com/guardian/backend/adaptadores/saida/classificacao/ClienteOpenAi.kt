@@ -75,7 +75,7 @@ class ClienteOpenAi(
 
             Responda APENAS com JSON válido neste formato exato:
             {
-              "rotulo": "SAFE" | "EXPLICIT" | "GROOMING_RISK" | "VIOLENCE" | "DRUGS",
+              "rotulo": "SAFE" | "EXPLICIT" | "GROOMING_RISK" | "VIOLENCE" | "DRUGS" | "GAMBLING",
               "pontuacaoRisco": <inteiro de 0 a 100>,
               "justificativa": "<breve explicação em português>"
             }
@@ -85,6 +85,7 @@ class ClienteOpenAi(
             - VIOLENCE (31-60): Conteúdo com violência moderada, jogos de ação, notícias sobre crimes.
             - GROOMING_RISK (60-75): Chats anônimos, fóruns sem moderação, aplicativos de encontro, redes de mensagens sem controle de idade.
             - DRUGS (50-75): Conteúdo sobre drogas, álcool, tabaco, substâncias ilícitas.
+            - GAMBLING (60-85): Casas de apostas, cassinos online, jogos de azar com dinheiro real, apostas esportivas, sites de poker.
             - EXPLICIT (76-100): Pornografia, conteúdo sexual explícito, nudez, sites adultos (+18).
 
             Seja conservador: na dúvida, prefira uma pontuação mais alta para proteger crianças.
