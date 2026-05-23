@@ -7,6 +7,7 @@ import br.com.guardian.backend.aplicacao.porta.entrada.ServicoPolitica
 import br.com.guardian.backend.dominio.excecao.DispositivoNaoEncontradoExcecao
 import br.com.guardian.backend.dominio.modelo.Evento
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.net.URI
 import java.security.MessageDigest
@@ -23,12 +24,74 @@ class ServicoIngestaoEvento(
     private val servicoBlocklistS3: ServicoBlocklistS3
 ) {
 
+    companion object {
+        private val logger = LoggerFactory.getLogger(ServicoIngestaoEvento::class.java)
+
+        private fun ehPlataformaMista(host: String): Boolean {
+            val h = host.lowercase()
+            return h in ServicoBlocklistS3.PLATAFORMAS_MISTAS ||
+                ServicoBlocklistS3.PLATAFORMAS_MISTAS.any { plat ->
+                    h.endsWith("." + plat.removePrefix("www."))
+                }
+        }
+
+        /**
+         * Retorna a chave de conteúdo para uso em S3 e cache de classificação.
+         *
+         * - Sites normais  → domínio puro  (ex: "pornhub.com")
+         * - Plataformas    → URL do conteúdo específico:
+         *     YouTube  → "youtube.com/watch?v=VIDEO_ID"
+         *     youtu.be → "youtube.com/watch?v=VIDEO_ID"
+         *     Outros   → "host/path"  (ex: "vimeo.com/123456")
+         *
+         * Isso permite bloquear/liberar um vídeo sem afetar o domínio inteiro.
+         */
+        fun extrairConteudoKey(host: String, urlOriginal: String): String {
+            if (!ehPlataformaMista(host)) return host
+            return try {
+                val uri = URI(urlOriginal)
+                val hostNorm = host.lowercase().removePrefix("www.")
+                val path = uri.path?.takeIf { it.isNotBlank() && it != "/" }
+
+                when {
+                    hostNorm == "youtube.com" -> {
+                        val videoId = uri.query?.split("&")
+                            ?.find { it.startsWith("v=") }
+                            ?.removePrefix("v=")
+                            ?.takeIf { it.isNotBlank() }
+                        if (videoId != null) "youtube.com/watch?v=$videoId" else host
+                    }
+                    hostNorm == "youtu.be" -> {
+                        // https://youtu.be/VIDEO_ID
+                        path?.let { "youtube.com/watch?v=${it.removePrefix("/")}" } ?: host
+                    }
+                    path != null -> "$hostNorm$path"
+                    else -> host
+                }
+            } catch (e: Exception) { host }
+        }
+    }
+
     fun ingerirLote(requisicao: RequisicaoIngestaoLoteEvento): Int {
 
         val dispositivo = dispositivoRepositorio.findById(requisicao.dispositivoId)
             .orElseThrow { DispositivoNaoEncontradoExcecao() }
 
-        val pares: List<Pair<String, Evento>> = requisicao.eventos.map { dto ->
+        // Filtra URLs que não são http/https (ex: edge://, chrome://, about:, etc.)
+        val eventosValidos = requisicao.eventos.filter { dto ->
+            val valido = dto.url.startsWith("http://") || dto.url.startsWith("https://")
+            if (!valido) {
+                logger.debug("[Ingestao] URL ignorada (esquema nao-http): {}", dto.url)
+            }
+            valido
+        }
+
+        if (eventosValidos.isEmpty()) {
+            logger.debug("[Ingestao] Nenhum evento http/https no lote — ignorando classificacao")
+            return 0
+        }
+
+        val pares: List<Pair<String, Evento>> = eventosValidos.map { dto ->
             val (host, pathHash) = extrairHostEPathHash(dto.url)
 
             dto.url to Evento(
@@ -46,7 +109,10 @@ class ServicoIngestaoEvento(
 
         salvos.forEachIndexed { idx, evento ->
             val urlOriginal = pares[idx].first
-            val classificacao = servicoClassificacao.classificar(evento, urlOriginal)
+            // Chave de conteúdo granular: domínio para sites normais,
+            // URL do conteúdo específico para plataformas (ex: youtube.com/watch?v=VIDEO_ID)
+            val conteudoKey = extrairConteudoKey(evento.urlHost, urlOriginal)
+            val classificacao = servicoClassificacao.classificar(evento, urlOriginal, conteudoKey)
 
             val deveBloquear = servicoPolitica.deveBloquear(
                 dominio = evento.urlHost,
@@ -58,11 +124,19 @@ class ServicoIngestaoEvento(
                 servicoPolitica.adicionarDominioBloqueado(evento.urlHost, dispositivo.id)
             }
 
-            // S3 blacklist: sites com risco alto OU qualquer site que a política individual bloqueou
+            // S3: usa conteudoKey → para plataformas, armazena o conteúdo específico
+            // (ex: "youtube.com/watch?v=BAD_VIDEO") e não o domínio inteiro
             if (classificacao.pontuacaoRisco >= 70 || deveBloquear) {
-                servicoBlocklistS3.adicionarAoBlacklist(evento.urlHost)
+                servicoBlocklistS3.adicionarAoBlacklist(conteudoKey)
             } else if (classificacao.rotulo == "SAFE") {
-                servicoBlocklistS3.adicionarAoWhitelist(evento.urlHost)
+                servicoBlocklistS3.adicionarAoWhitelist(conteudoKey)
+            }
+
+            if (ehPlataformaMista(evento.urlHost)) {
+                logger.debug(
+                    "[Ingestao] Plataforma mista: host={} conteudoKey={} score={}",
+                    evento.urlHost, conteudoKey, classificacao.pontuacaoRisco
+                )
             }
         }
 

@@ -21,6 +21,24 @@ class ServicoBlocklistS3(
 ) {
     private val logger = LoggerFactory.getLogger(ServicoBlocklistS3::class.java)
 
+    companion object {
+        // Plataformas com conteúdo misto — nunca devem entrar nas listas globais do S3.
+        // Sincronizado com ServicoIngestaoEvento.PLATAFORMAS_MISTAS.
+        val PLATAFORMAS_MISTAS = setOf(
+            "youtube.com", "www.youtube.com", "youtu.be",
+            "twitch.tv", "www.twitch.tv",
+            "reddit.com", "www.reddit.com",
+            "twitter.com", "www.twitter.com", "x.com", "www.x.com",
+            "tiktok.com", "www.tiktok.com",
+            "instagram.com", "www.instagram.com",
+            "facebook.com", "www.facebook.com",
+            "dailymotion.com", "www.dailymotion.com",
+            "vimeo.com", "www.vimeo.com",
+            "linkedin.com", "www.linkedin.com",
+            "pinterest.com", "www.pinterest.com",
+        )
+    }
+
     // Lazy init: so cria o cliente se o bucket estiver configurado
     private val s3: S3Client? by lazy {
         if (bucket.isBlank()) {
@@ -43,6 +61,26 @@ class ServicoBlocklistS3(
     fun adicionarAoWhitelist(host: String) = adicionarAoArquivo("whiteList.json", host)
 
     fun adicionarAoBlacklist(host: String) = adicionarAoArquivo("blackList.json", host)
+
+    fun estaNaBlacklist(host: String): Boolean {
+        val client = s3 ?: return false
+        return try {
+            lerLista(client, "blackList.json").contains(host)
+        } catch (e: Exception) {
+            logger.warn("[S3] Falha ao verificar blacklist para host={}: {}", host, e.message)
+            false
+        }
+    }
+
+    fun estaNaWhitelist(host: String): Boolean {
+        val client = s3 ?: return false
+        return try {
+            lerLista(client, "whiteList.json").contains(host)
+        } catch (e: Exception) {
+            logger.warn("[S3] Falha ao verificar whitelist para host={}: {}", host, e.message)
+            false
+        }
+    }
 
     private fun adicionarAoArquivo(chave: String, host: String) {
         val client = s3 ?: return

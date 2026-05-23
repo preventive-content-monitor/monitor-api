@@ -60,11 +60,7 @@ class ClienteOpenAi(
             resultado
         } catch (ex: Exception) {
             logger.error("[OpenAI] Falha ao classificar host={}: {}", host, ex.message)
-            RespostaClassificacao(
-                rotulo = "SAFE",
-                pontuacaoRisco = 0,
-                justificativa = "Erro na classificação automática: ${ex.message}"
-            )
+            throw ex
         }
     }
 

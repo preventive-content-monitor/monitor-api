@@ -27,6 +27,12 @@ class ResultadoClassificacao(
     @Column(name = "url_host", length = 255)
     val urlHost: String? = null,
 
+    // Chave de conteúdo granular: para plataformas mistas (YouTube, Vimeo, etc.)
+    // armazena o identificador do conteúdo específico (ex: "youtube.com/watch?v=VIDEO_ID").
+    // Para demais domínios é igual a urlHost. Usado para cache e S3.
+    @Column(name = "url_conteudo", length = 500)
+    val urlConteudo: String? = null,
+
     @Lob
     @Column(name = "justificativa")
     val justificativa: String? = null,

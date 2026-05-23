@@ -1,5 +1,6 @@
 package br.com.guardian.backend.aplicacao.servico
 
+import br.com.guardian.backend.adaptadores.saida.classificacao.ClienteClassificador
 import br.com.guardian.backend.adaptadores.saida.classificacao.ClienteOpenAi
 import br.com.guardian.backend.adaptadores.saida.persistencia.ClassificacaoRepositorio
 import br.com.guardian.backend.dominio.modelo.Evento
@@ -13,6 +14,8 @@ import java.time.Instant
 @Service
 class ServicoClassificacao(
     private val clienteOpenAi: ClienteOpenAi,
+    private val clienteClassificador: ClienteClassificador,
+    private val servicoBlocklistS3: ServicoBlocklistS3,
     private val classificacaoRepositorio: ClassificacaoRepositorio
 ) {
     private val logger = LoggerFactory.getLogger(ServicoClassificacao::class.java)
@@ -21,18 +24,29 @@ class ServicoClassificacao(
         private val CACHE_TTL = Duration.ofHours(24)
     }
 
-    fun classificar(evento: Evento, urlCompleta: String): ResultadoClassificacao {
+    /**
+     * @param conteudoKey chave granular de conteúdo:
+     *   - Sites normais: igual a urlHost (ex: "pornhub.com")
+     *   - Plataformas mistas: URL do conteúdo específico (ex: "youtube.com/watch?v=VIDEO_ID")
+     * Usado para cache 24h e operações S3 — evita que um vídeo seguro no YouTube
+     * faça o cache retornar SAFE para todos os outros vídeos do mesmo domínio.
+     */
+    fun classificar(evento: Evento, urlCompleta: String, conteudoKey: String): ResultadoClassificacao {
         val desde = Instant.now().minus(CACHE_TTL)
-        val cacheHit = classificacaoRepositorio.findPrimeiraRecente(evento.urlHost, desde, PageRequest.of(0, 1)).firstOrNull()
+
+        // Cache lookup por conteúdo granular (não por domínio)
+        val cacheHit = classificacaoRepositorio
+            .findPrimeiraRecentePorConteudo(conteudoKey, desde, PageRequest.of(0, 1))
+            .firstOrNull()
 
         if (cacheHit != null) {
-            logger.info("[Cache HIT] host={} rotulo={} score={}", evento.urlHost, cacheHit.rotulo, cacheHit.pontuacaoRisco)
+            logger.info("[Cache HIT] conteudo={} rotulo={} score={}", conteudoKey, cacheHit.rotulo, cacheHit.pontuacaoRisco)
             val modeloBase = cacheHit.modelo.removeSuffix("-cached")
-            // Cria registro para este evento com valores do cache
             return classificacaoRepositorio.save(
                 ResultadoClassificacao(
                     evento = evento,
                     urlHost = evento.urlHost,
+                    urlConteudo = conteudoKey,
                     modelo = "$modeloBase-cached",
                     rotulo = cacheHit.rotulo,
                     pontuacaoRisco = cacheHit.pontuacaoRisco,
@@ -41,17 +55,52 @@ class ServicoClassificacao(
             )
         }
 
-        val resposta = clienteOpenAi.classificar(evento.titulo, urlCompleta, evento.urlHost)
-
-        return classificacaoRepositorio.save(
-            ResultadoClassificacao(
-                evento = evento,
-                urlHost = evento.urlHost,
-                modelo = "gpt-4o-mini",
-                rotulo = resposta.rotulo,
-                pontuacaoRisco = resposta.pontuacaoRisco,
-                justificativa = resposta.justificativa
+        try {
+            val resposta = clienteOpenAi.classificar(evento.titulo, urlCompleta, evento.urlHost)
+            return classificacaoRepositorio.save(
+                ResultadoClassificacao(
+                    evento = evento,
+                    urlHost = evento.urlHost,
+                    urlConteudo = conteudoKey,
+                    modelo = "gpt-4o-mini",
+                    rotulo = resposta.rotulo,
+                    pontuacaoRisco = resposta.pontuacaoRisco,
+                    justificativa = resposta.justificativa
+                )
             )
-        )
+        } catch (e: Exception) {
+            logger.warn("[Classificacao] OpenAI indisponivel para conteudo={}, verificando S3 blacklist...", conteudoKey)
+
+            // 1º fallback: S3 blacklist — conteúdo já classificado como perigoso anteriormente
+            if (servicoBlocklistS3.estaNaBlacklist(conteudoKey)) {
+                logger.info("[Classificacao] conteudo={} encontrado na S3 blacklist", conteudoKey)
+                return classificacaoRepositorio.save(
+                    ResultadoClassificacao(
+                        evento = evento,
+                        urlHost = evento.urlHost,
+                        urlConteudo = conteudoKey,
+                        modelo = "s3-blacklist-fallback",
+                        rotulo = "EXPLICIT",
+                        pontuacaoRisco = 90,
+                        justificativa = "Conteúdo presente na blacklist S3 (OpenAI indisponível)"
+                    )
+                )
+            }
+
+            // 2º fallback: classificador local por palavras-chave
+            logger.info("[Classificacao] conteudo={} nao encontrado no S3, usando classificador local", conteudoKey)
+            val (rotulo, score) = clienteClassificador.classificar(evento.titulo, evento.urlHost)
+            return classificacaoRepositorio.save(
+                ResultadoClassificacao(
+                    evento = evento,
+                    urlHost = evento.urlHost,
+                    urlConteudo = conteudoKey,
+                    modelo = "keyword-fallback",
+                    rotulo = rotulo,
+                    pontuacaoRisco = score,
+                    justificativa = "Classificação local por palavras-chave (OpenAI indisponível)"
+                )
+            )
+        }
     }
 }
