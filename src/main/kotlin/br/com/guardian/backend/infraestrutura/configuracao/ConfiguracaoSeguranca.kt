@@ -75,16 +75,10 @@ class ConfiguracaoSeguranca {
     @Bean
     fun fonteConfiguracaoCors(): CorsConfigurationSource {
         val configuracao = CorsConfiguration()
-        configuracao.allowedOriginPatterns = listOf(
-            "http://localhost:*",
-            "http://127.0.0.1:*",
-            "http://*",          // EC2 public IP/DNS (dinamico)
-            "chrome-extension://*",
-            "moz-extension://*"
-        )
+        configuracao.allowedOriginPatterns = listOf("*")
         configuracao.allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
         configuracao.allowedHeaders = listOf("*")
-        configuracao.allowCredentials = true
+        // allowCredentials NAO definido: JWT usa header Authorization, nao cookies
         val fonte = UrlBasedCorsConfigurationSource()
         fonte.registerCorsConfiguration("/**", configuracao)
         return fonte

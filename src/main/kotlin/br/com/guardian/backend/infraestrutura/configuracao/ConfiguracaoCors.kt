@@ -13,15 +13,9 @@ class ConfiguracaoCors {
         object : WebMvcConfigurer {
             override fun addCorsMappings(registry: CorsRegistry) {
                 registry.addMapping("/**")
-                    .allowedOriginPatterns(
-                        "http://localhost:*",
-                        "http://127.0.0.1:*",
-                        "http://*",          // EC2 public IP/DNS (dinamico)
-                        "chrome-extension://*"
-                    )
+                    .allowedOriginPatterns("*")
                     .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                     .allowedHeaders("*")
-                    .allowCredentials(true)
             }
         }
 }

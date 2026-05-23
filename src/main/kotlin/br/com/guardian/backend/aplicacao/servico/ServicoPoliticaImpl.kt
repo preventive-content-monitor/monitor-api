@@ -83,13 +83,16 @@ class ServicoPoliticaImpl(
 
         if (listaBloqueados.contains(dominio)) return true
 
-        return pontuacaoRisco >= politica.limiteRisco && politica.modo == ModoPolitica.BLOCK
+        // Funciona para qualquer modo (BLOCK, WARN, EDUCATE) — o modo determina como a extensão exibe o bloqueio,
+        // não se o domínio deve ser adicionado à lista de domínios sinalizados.
+        return pontuacaoRisco >= politica.limiteRisco
     }
 
     override fun adicionarDominioBloqueado(dominio: String, dispositivoId: UUID) {
         val politica = buscarPoliticaPorDispositivo(dispositivoId)
 
-        if (politica.modo != ModoPolitica.BLOCK) return
+        // Adiciona independentemente do modo — BLOCK bloqueia, WARN avisa, EDUCATE educa.
+        // O modo é usado pela extensão para decidir o comportamento de apresentação.
 
         val lista: MutableList<String> = serializadorJson
             .desserializarLista(politica.dominiosBloqueados, String::class.java)
