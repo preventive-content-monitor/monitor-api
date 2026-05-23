@@ -62,6 +62,20 @@ class ServicoBlocklistS3(
 
     fun adicionarAoBlacklist(host: String) = adicionarAoArquivo("blackList.json", host)
 
+    /**
+     * Sobrescreve o arquivo no S3 com a lista completa fornecida.
+     * Chamado pelo ServicoExportacaoS3 a cada 5 minutos.
+     */
+    fun gravarListaCompleta(chave: String, lista: List<String>) {
+        val client = s3 ?: return
+        try {
+            gravarLista(client, chave, lista)
+            logger.info("[S3] {} atualizado com {} entradas", chave, lista.size)
+        } catch (e: Exception) {
+            logger.error("[S3] Erro ao gravar lista completa em {}: {}", chave, e.message)
+        }
+    }
+
     fun estaNaBlacklist(host: String): Boolean {
         val client = s3 ?: return false
         return try {

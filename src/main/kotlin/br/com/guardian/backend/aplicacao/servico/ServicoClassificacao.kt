@@ -15,7 +15,7 @@ import java.time.Instant
 class ServicoClassificacao(
     private val clienteOpenAi: ClienteOpenAi,
     private val clienteClassificador: ClienteClassificador,
-    private val servicoBlocklistS3: ServicoBlocklistS3,
+    private val servicoBlocklist: ServicoBlocklist,
     private val classificacaoRepositorio: ClassificacaoRepositorio
 ) {
     private val logger = LoggerFactory.getLogger(ServicoClassificacao::class.java)
@@ -69,26 +69,26 @@ class ServicoClassificacao(
                 )
             )
         } catch (e: Exception) {
-            logger.warn("[Classificacao] OpenAI indisponivel para conteudo={}, verificando S3 blacklist...", conteudoKey)
+            logger.warn("[Classificacao] OpenAI indisponivel para conteudo={}, verificando blocklist no DB...", conteudoKey)
 
-            // 1º fallback: S3 blacklist — conteúdo já classificado como perigoso anteriormente
-            if (servicoBlocklistS3.estaNaBlacklist(conteudoKey)) {
-                logger.info("[Classificacao] conteudo={} encontrado na S3 blacklist", conteudoKey)
+            // 1º fallback: blocklist DB — conteúdo já classificado como perigoso anteriormente
+            if (servicoBlocklist.estaNaBlacklist(conteudoKey)) {
+                logger.info("[Classificacao] conteudo={} encontrado na blocklist (DB)", conteudoKey)
                 return classificacaoRepositorio.save(
                     ResultadoClassificacao(
                         evento = evento,
                         urlHost = evento.urlHost,
                         urlConteudo = conteudoKey,
-                        modelo = "s3-blacklist-fallback",
+                        modelo = "db-blacklist-fallback",
                         rotulo = "EXPLICIT",
                         pontuacaoRisco = 90,
-                        justificativa = "Conteúdo presente na blacklist S3 (OpenAI indisponível)"
+                        justificativa = "Conteudo presente na blocklist (DB) — OpenAI indisponivel"
                     )
                 )
             }
 
             // 2º fallback: classificador local por palavras-chave
-            logger.info("[Classificacao] conteudo={} nao encontrado no S3, usando classificador local", conteudoKey)
+            logger.info("[Classificacao] conteudo={} nao encontrado no DB, usando classificador local", conteudoKey)
             val (rotulo, score) = clienteClassificador.classificar(evento.titulo, evento.urlHost)
             return classificacaoRepositorio.save(
                 ResultadoClassificacao(

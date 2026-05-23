@@ -21,7 +21,7 @@ class ServicoIngestaoEvento(
     private val servicoClassificacao: ServicoClassificacao,
     private val servicoPolitica: ServicoPolitica,
     private val servicoVulnerabilidade: ServicoVulnerabilidade,
-    private val servicoBlocklistS3: ServicoBlocklistS3
+    private val servicoBlocklist: ServicoBlocklist
 ) {
 
     companion object {
@@ -124,13 +124,14 @@ class ServicoIngestaoEvento(
                 servicoPolitica.adicionarDominioBloqueado(evento.urlHost, dispositivo.id)
             }
 
-            // S3: usa conteudoKey → para plataformas, armazena o conteúdo específico
-            // (ex: "youtube.com/watch?v=BAD_VIDEO") e não o domínio inteiro
-            if (classificacao.pontuacaoRisco >= 70 || deveBloquear) {
-                servicoBlocklistS3.adicionarAoBlacklist(conteudoKey)
-            } else if (classificacao.rotulo == "SAFE") {
-                servicoBlocklistS3.adicionarAoWhitelist(conteudoKey)
-            }
+            // Grava classificação na tabela block_list (fonte de verdade).
+            // O ServicoExportacaoS3 sincroniza o MySQL → S3 a cada 5 minutos.
+            servicoBlocklist.registrar(
+                urlConteudo = conteudoKey,
+                rotulo = classificacao.rotulo,
+                pontuacaoRisco = classificacao.pontuacaoRisco,
+                modelo = classificacao.modelo
+            )
 
             if (ehPlataformaMista(evento.urlHost)) {
                 logger.debug(
