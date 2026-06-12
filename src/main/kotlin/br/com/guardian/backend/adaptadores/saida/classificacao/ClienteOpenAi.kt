@@ -26,11 +26,21 @@ class ClienteOpenAi(
         val justificativa: String
     )
 
-    fun classificar(titulo: String?, urlCompleta: String, host: String): RespostaClassificacao {
+    fun classificar(
+        titulo: String?,
+        urlCompleta: String,
+        host: String,
+        descricao: String? = null,
+        restricaoEtaria: Boolean = false,
+        categoria: String? = null
+    ): RespostaClassificacao {
         val mensagemUsuario = buildString {
             append("URL: $urlCompleta\n")
             append("Host: $host\n")
-            if (!titulo.isNullOrBlank()) append("Título: $titulo\n")
+            if (!titulo.isNullOrBlank())    append("Título: $titulo\n")
+            if (!descricao.isNullOrBlank()) append("Descrição: ${descricao.take(300)}\n")
+            if (!categoria.isNullOrBlank()) append("Categoria: $categoria\n")
+            if (restricaoEtaria)            append("AVISO: Este conteúdo possui restrição etária explícita (+18)\n")
         }
 
         val corpoRequisicao = mapOf(
@@ -66,25 +76,38 @@ class ClienteOpenAi(
 
     companion object {
         private val SYSTEM_PROMPT = """
-            Você é um classificador de conteúdo para controle parental infantil.
-            Analise a URL e o título fornecidos e classifique se o conteúdo é apropriado para menores de idade.
+            Você é um classificador de conteúdo para controle parental infantil rigoroso.
+            Analise a URL, título, descrição e metadados fornecidos e classifique se o conteúdo é apropriado para crianças e adolescentes menores de 18 anos.
 
             Responda APENAS com JSON válido neste formato exato:
             {
-              "rotulo": "SAFE" | "EXPLICIT" | "GROOMING_RISK" | "VIOLENCE" | "DRUGS" | "GAMBLING",
+              "rotulo": "SAFE" | "VIOLENCE" | "HORROR" | "EXPLICIT" | "GROOMING_RISK" | "DRUGS" | "GAMBLING",
               "pontuacaoRisco": <inteiro de 0 a 100>,
               "justificativa": "<breve explicação em português>"
             }
 
-            Critérios:
-            - SAFE (0-30): Conteúdo educativo, entretenimento geral, notícias, jogos apropriados para todas as idades.
-            - VIOLENCE (31-60): Conteúdo com violência moderada, jogos de ação, notícias sobre crimes.
-            - GROOMING_RISK (60-75): Chats anônimos, fóruns sem moderação, aplicativos de encontro, redes de mensagens sem controle de idade.
-            - DRUGS (50-75): Conteúdo sobre drogas, álcool, tabaco, substâncias ilícitas.
-            - GAMBLING (60-85): Casas de apostas, cassinos online, jogos de azar com dinheiro real, apostas esportivas, sites de poker.
-            - EXPLICIT (76-100): Pornografia, conteúdo sexual explícito, nudez, sites adultos (+18).
+            Critérios de classificação (seja SEMPRE conservador — na dúvida, pontue mais alto):
 
-            Seja conservador: na dúvida, prefira uma pontuação mais alta para proteger crianças.
+            - SAFE (0-25): Conteúdo educativo, ciência, natureza, culinária, esportes, música infantil, entretenimento familiar, notícias neutras. Adequado para todas as idades.
+
+            - VIOLENCE (26-55): Jogos de ação com violência leve/moderada, documentários sobre guerras/crimes, notícias sobre violência urbana, lutas/combates esportivos. Não recomendado para crianças pequenas.
+
+            - HORROR (56-80): Terror, suspense, jump scares, fantasmas, demônios, criaturas, pesadelos, compilados assustadores, conteúdo perturbador psicologicamente, títulos com palavras como "terror", "assustador", "pesadelo", "medo extremo", "perturbador". SEMPRE classifique como HORROR se o título contiver linguagem de terror intensa. NÃO É SAFE para menores de 14 anos.
+
+            - DRUGS (50-75): Conteúdo sobre drogas ilícitas, álcool, tabaco, substâncias psicoativas, "como fazer", glamourização de vícios.
+
+            - GROOMING_RISK (60-80): Chats anônimos, apps de encontro, fóruns sem moderação de idade, conteúdo que incentiva contato com estranhos.
+
+            - GAMBLING (60-85): Apostas online, cassinos, loot boxes, jogos de azar com dinheiro real.
+
+            - EXPLICIT (76-100): Pornografia, conteúdo sexual explícito, nudez, sites adultos (+18). Se houver restrição etária explícita, pontuação mínima de 85.
+
+            REGRAS ESPECIAIS:
+            1. Se o título contiver "terror", "horror", "assustador", "pesadelo", "medo", "perturbador", "extremo", "jump scare" ou similares em PT/EN → mínimo 60 pontos (HORROR).
+            2. Se houver restrição etária (+18) explícita → mínimo 85 pontos (EXPLICIT).
+            3. Conteúdo que mistura violência extrema + terror → mínimo 70 pontos.
+            4. Títulos em CAPS LOCK com conteúdo de terror são intencionalmente sensacionalistas → trate como mais grave.
+            5. Compilados de sustos, vídeos virais de terror, "videos assustadores" → mínimo 60 pontos.
         """.trimIndent()
     }
 }

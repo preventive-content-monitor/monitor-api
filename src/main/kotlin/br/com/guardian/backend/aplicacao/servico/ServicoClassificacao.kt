@@ -55,6 +55,25 @@ class ServicoClassificacao(
             )
         }
 
+        // Cache permanente: block_list já tem classificação anterior (além do cache 24h acima).
+        // Se o conteúdo já foi analisado pela IA alguma vez e está na block_list,
+        // reutiliza esse resultado sem chamar a OpenAI novamente.
+        val blockListHit = servicoBlocklist.buscarPorConteudo(conteudoKey)
+        if (blockListHit != null) {
+            logger.info("[BlockList HIT] conteudo={} rotulo={} score={}", conteudoKey, blockListHit.rotulo, blockListHit.pontuacaoRisco)
+            return classificacaoRepositorio.save(
+                ResultadoClassificacao(
+                    evento = evento,
+                    urlHost = evento.urlHost,
+                    urlConteudo = conteudoKey,
+                    modelo = "${blockListHit.modelo}-blocklist-cached",
+                    rotulo = blockListHit.rotulo,
+                    pontuacaoRisco = blockListHit.pontuacaoRisco,
+                    justificativa = "Classificacao reutilizada da block_list (cache permanente)"
+                )
+            )
+        }
+
         try {
             val resposta = clienteOpenAi.classificar(evento.titulo, urlCompleta, evento.urlHost)
             return classificacaoRepositorio.save(

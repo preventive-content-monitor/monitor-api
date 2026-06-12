@@ -114,7 +114,12 @@ class ServicoIngestaoEvento(
             val conteudoKey = extrairConteudoKey(evento.urlHost, urlOriginal)
             val classificacao = servicoClassificacao.classificar(evento, urlOriginal, conteudoKey)
 
-            val deveBloquear = servicoPolitica.deveBloquear(
+            // Plataformas mistas (YouTube, Twitch, etc.) nunca têm o domínio inteiro bloqueado —
+            // apenas o conteúdo específico é marcado na block_list (cache da classificação).
+            // Bloquear "youtube.com" derrubaria todos os vídeos, incluindo os seguros.
+            val ehPlataformaMistaEvento = ehPlataformaMista(evento.urlHost)
+
+            val deveBloquear = !ehPlataformaMistaEvento && servicoPolitica.deveBloquear(
                 dominio = evento.urlHost,
                 pontuacaoRisco = classificacao.pontuacaoRisco,
                 dispositivoId = dispositivo.id

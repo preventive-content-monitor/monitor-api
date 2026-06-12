@@ -41,12 +41,13 @@ class ServicoVulnerabilidade(
             hora in 22..23 || hora in 0..6
         }
 
-        val pontuacaoBruta =
-            (0.5 * sensiveis +
-                    0.3 * tentativasBloqueio +
-                    0.2 * usoNoturno).toInt()
+        // Cada evento sensível contribui 20pts, bloqueio 15pts, uso noturno 10pts
+        // Caps individuais evitam que um único fator domine o score
+        val ptsSensiveis     = min(sensiveis * 20, 60)
+        val ptsBloqueio      = min(tentativasBloqueio * 15, 45)
+        val ptsNoturno       = min(usoNoturno * 10, 30)
 
-        val pontuacaoFinal = min(pontuacaoBruta, 100)
+        val pontuacaoFinal   = min(ptsSensiveis + ptsBloqueio + ptsNoturno, 100)
 
         val caracteristicas = "sensiveis=$sensiveis,bloqueio=$tentativasBloqueio,noturno=$usoNoturno"
 

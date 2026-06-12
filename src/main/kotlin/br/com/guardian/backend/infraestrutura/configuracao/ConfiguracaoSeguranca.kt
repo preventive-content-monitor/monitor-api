@@ -33,6 +33,7 @@ class ConfiguracaoSeguranca {
         AntPathRequestMatcher("/api/dispositivos/vincular"),
         AntPathRequestMatcher("/api/politica/atual"),
         AntPathRequestMatcher("/api/blocklist/verificar"),
+        AntPathRequestMatcher("/api/blocklist/classificar-agora"),
         AntPathRequestMatcher("/v3/api-docs/**"),
         AntPathRequestMatcher("/v3/api-docs"),
         AntPathRequestMatcher("/swagger-ui.html"),

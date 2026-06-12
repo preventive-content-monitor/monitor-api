@@ -76,6 +76,20 @@ class DispositivoController(
         }
     }
 
+    @DeleteMapping("/{dispositivoId}")
+    @Operation(summary = "Remover dispositivo", description = "Remove um dispositivo vinculado ao dependente do usuário autenticado")
+    fun removerDispositivo(
+        @PathVariable dispositivoId: UUID,
+        @AuthenticationPrincipal principal: org.springframework.security.oauth2.jwt.Jwt
+    ) {
+        val usuarioId = UUID.fromString(principal.subject)
+        val dispositivo = dispositivoRepositorio.findById(dispositivoId)
+            .orElseThrow { br.com.guardian.backend.dominio.excecao.DispositivoNaoEncontradoExcecao() }
+        if (dispositivo.dependente.usuarioGuardian.id != usuarioId)
+            throw br.com.guardian.backend.dominio.excecao.DispositivoNaoEncontradoExcecao()
+        dispositivoRepositorio.delete(dispositivo)
+    }
+
     @PostMapping("/gerar-codigo/{dependenteId}")
     @Operation(
         summary = "Gerar código de vinculação",
