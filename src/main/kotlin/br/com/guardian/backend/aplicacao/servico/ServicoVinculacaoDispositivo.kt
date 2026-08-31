@@ -5,6 +5,8 @@ import br.com.guardian.backend.adaptadores.saida.persistencia.DispositivoReposit
 import br.com.guardian.backend.dominio.excecao.DependenteNaoEncontradoExcecao
 import br.com.guardian.backend.dominio.excecao.CodigoVinculacaoInvalidoExcecao
 import br.com.guardian.backend.dominio.modelo.Dispositivo
+import br.com.guardian.backend.dominio.modelo.SeveridadeAlerta
+import br.com.guardian.backend.dominio.modelo.TipoAlerta
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.*
@@ -13,7 +15,8 @@ import java.util.concurrent.ConcurrentHashMap
 @Service
 class ServicoVinculacaoDispositivo(
     private val dependenteRepositorio: DependenteRepositorio,
-    private val dispositivoRepositorio: DispositivoRepositorio
+    private val dispositivoRepositorio: DispositivoRepositorio,
+    private val servicoAlerta: ServicoAlerta
 ) {
 
     private val codigosVinculacao = ConcurrentHashMap<String, Pair<UUID, Instant>>()
@@ -45,6 +48,20 @@ class ServicoVinculacaoDispositivo(
 
         codigosVinculacao.remove(codigo)
 
-        return dispositivoRepositorio.save(dispositivo)
+        val salvo = dispositivoRepositorio.save(dispositivo)
+
+        // Informativo: aparece na Central de Alertas mas não dispara email,
+        // já que a vinculação foi iniciada pelo próprio responsável.
+        servicoAlerta.registrar(
+            usuario    = dependente.usuarioGuardian,
+            dependente = dependente,
+            tipo       = TipoAlerta.NOVO_DISPOSITIVO,
+            severidade = SeveridadeAlerta.INFO,
+            titulo     = "Novo dispositivo conectado",
+            mensagem   = "$nomeDispositivo foi vinculado a ${dependente.apelido}.",
+            referencia = salvo.id.toString()
+        )
+
+        return salvo
     }
 }

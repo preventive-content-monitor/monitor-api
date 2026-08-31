@@ -9,6 +9,24 @@ spring:
     password: ${DB_PASSWORD:0212}
   flyway:
     enabled: false
+  # SMTP para notificações. Credenciais injetadas pelo passo 7 da infraestrutura.
+  # Sem GUARDIAN_MAIL_HOST o envio fica desabilitado: os alertas continuam
+  # aparecendo no painel, apenas nenhum email sai.
+  mail:
+    host: ${GUARDIAN_MAIL_HOST:}
+    port: ${GUARDIAN_MAIL_PORT:587}
+    username: ${GUARDIAN_MAIL_USERNAME:}
+    password: ${GUARDIAN_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
   jpa:
     hibernate:
       ddl-auto: update
@@ -35,6 +53,10 @@ guardian:
   s3:
     bucket: ${GUARDIAN_S3_BUCKET:}
     region: ${AWS_DEFAULT_REGION:us-east-1}
+  mail:
+    # Remetente dos emails. Por padrão usa a mesma conta autenticada no SMTP.
+    remetente: ${GUARDIAN_MAIL_REMETENTE:${GUARDIAN_MAIL_USERNAME:}}
+    nome-remetente: ${GUARDIAN_MAIL_NOME:Guardian}
 
 openai:
   api-key: ${OPENAI_API_KEY:}

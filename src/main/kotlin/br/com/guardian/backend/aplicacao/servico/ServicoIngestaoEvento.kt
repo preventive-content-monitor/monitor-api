@@ -6,6 +6,9 @@ import br.com.guardian.backend.adaptadores.saida.persistencia.EventoRepositorio
 import br.com.guardian.backend.aplicacao.porta.entrada.ServicoPolitica
 import br.com.guardian.backend.dominio.excecao.DispositivoNaoEncontradoExcecao
 import br.com.guardian.backend.dominio.modelo.Evento
+import br.com.guardian.backend.dominio.modelo.SeveridadeAlerta
+import br.com.guardian.backend.dominio.modelo.TipoAlerta
+import br.com.guardian.backend.dominio.modelo.TipoEvento
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -21,7 +24,8 @@ class ServicoIngestaoEvento(
     private val servicoClassificacao: ServicoClassificacao,
     private val servicoPolitica: ServicoPolitica,
     private val servicoVulnerabilidade: ServicoVulnerabilidade,
-    private val servicoBlocklist: ServicoBlocklist
+    private val servicoBlocklist: ServicoBlocklist,
+    private val servicoAlerta: ServicoAlerta
 ) {
 
     companion object {
@@ -144,6 +148,8 @@ class ServicoIngestaoEvento(
                     evento.urlHost, conteudoKey, classificacao.pontuacaoRisco
                 )
             }
+
+            notificarSeNecessario(evento, dispositivo, conteudoKey, classificacao.pontuacaoRisco, classificacao.rotulo)
         }
 
         dispositivo.ultimoAcessoEm = java.time.Instant.now()
@@ -157,6 +163,61 @@ class ServicoIngestaoEvento(
         }
 
         return salvos.size
+    }
+
+    /**
+     * Gera alerta para o responsável quando o acesso merece atenção.
+     *
+     * Dois gatilhos, correspondentes às duas preferências de notificação:
+     *  - evento BLOCK_ATTEMPT       → tentativa de burlar um bloqueio (crítico)
+     *  - score acima do limite      → conteúdo sensível detectado (atenção)
+     *
+     * A deduplicação por conteúdo fica no ServicoAlerta, então recarregar a
+     * mesma página bloqueada não gera uma enxurrada de emails.
+     */
+    private fun notificarSeNecessario(
+        evento: Evento,
+        dispositivo: br.com.guardian.backend.dominio.modelo.Dispositivo,
+        conteudoKey: String,
+        pontuacaoRisco: Int,
+        rotulo: String
+    ) {
+        val dependente = dispositivo.dependente
+        val usuario    = dependente.usuarioGuardian
+
+        if (evento.tipo == TipoEvento.BLOCK_ATTEMPT) {
+            servicoAlerta.registrar(
+                usuario        = usuario,
+                dependente     = dependente,
+                tipo           = TipoAlerta.TENTATIVA_BLOQUEIO,
+                severidade     = SeveridadeAlerta.CRITICO,
+                titulo         = "Tentativa de acesso bloqueado",
+                mensagem       = "${dependente.apelido} tentou acessar ${evento.urlHost}, que está bloqueado pela política do dispositivo.",
+                referencia     = conteudoKey,
+                pontuacaoRisco = pontuacaoRisco
+            )
+            return
+        }
+
+        val limite = try {
+            servicoPolitica.buscarPoliticaPorDispositivo(dispositivo.id).limiteRisco
+        } catch (e: Exception) {
+            logger.debug("[Alerta] Politica indisponivel para dispositivo={}", dispositivo.id)
+            return
+        }
+
+        if (rotulo != "SAFE" && pontuacaoRisco >= limite) {
+            servicoAlerta.registrar(
+                usuario        = usuario,
+                dependente     = dependente,
+                tipo           = TipoAlerta.CONTEUDO_SENSIVEL,
+                severidade     = if (pontuacaoRisco >= 85) SeveridadeAlerta.CRITICO else SeveridadeAlerta.ATENCAO,
+                titulo         = "Conteúdo sensível detectado",
+                mensagem       = "${dependente.apelido} acessou conteúdo classificado como $rotulo em ${evento.urlHost}.",
+                referencia     = conteudoKey,
+                pontuacaoRisco = pontuacaoRisco
+            )
+        }
     }
 
     private fun extrairHostEPathHash(url: String): Pair<String, String?> {
