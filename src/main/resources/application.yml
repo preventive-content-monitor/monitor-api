@@ -55,6 +55,9 @@ guardian:
     # Remetente dos emails. Por padrão usa a mesma conta autenticada no SMTP.
     remetente: ${GUARDIAN_MAIL_REMETENTE:${GUARDIAN_MAIL_USERNAME:}}
     nome-remetente: ${GUARDIAN_MAIL_NOME:Guardian}
+  contato:
+    # Caixa que recebe as mensagens do formulário "Entre em contato" da landing.
+    destino: ${GUARDIAN_CONTATO_DESTINO:ruancrdz2004@gmail.com}
 
 openai:
   api-key: ${OPENAI_API_KEY:}

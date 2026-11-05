@@ -42,6 +42,7 @@ class ConfiguracaoSeguranca {
         AntPathRequestMatcher("/api/autenticacao/entrar"),
         AntPathRequestMatcher("/api/autenticacao/entrar-configuracao"),
         AntPathRequestMatcher("/api/autenticacao/entrar-vinculo"),
+        AntPathRequestMatcher("/api/contato", "POST"),
         AntPathRequestMatcher("/v3/api-docs/**"),
         AntPathRequestMatcher("/v3/api-docs"),
         AntPathRequestMatcher("/swagger-ui.html"),

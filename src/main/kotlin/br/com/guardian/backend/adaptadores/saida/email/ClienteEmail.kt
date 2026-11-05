@@ -35,7 +35,12 @@ class ClienteEmail(
      * @return true se o email saiu; false se o SMTP está desligado ou o envio falhou.
      *         Falha de email nunca propaga — não pode derrubar a ingestão de eventos.
      */
-    fun enviarHtml(destinatario: String, assunto: String, corpoHtml: String): Boolean {
+    fun enviarHtml(
+        destinatario: String,
+        assunto: String,
+        corpoHtml: String,
+        responderPara: String? = null
+    ): Boolean {
         if (!habilitado) {
             logger.debug("[Email] SMTP nao configurado — ignorando envio para {}", destinatario)
             return false
@@ -53,6 +58,7 @@ class ClienteEmail(
 
             helper.setFrom(remetente, nomeRemetente)
             helper.setTo(destinatario)
+            if (!responderPara.isNullOrBlank()) helper.setReplyTo(responderPara)
             helper.setSubject(assunto)
             helper.setText(corpoHtml, true)
 

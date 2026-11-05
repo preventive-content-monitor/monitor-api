@@ -50,7 +50,13 @@ class ModelosEmail {
         .replace("\"", "&quot;")
 
     /** Moldura comum a todos os emails: cabeçalho, corpo e rodapé. */
-    private fun moldura(titulo: String, corAcento: String, conteudo: String): String = """
+    private fun moldura(
+        titulo: String,
+        corAcento: String,
+        conteudo: String,
+        rodape: String = "Você recebeu este email porque ativou notificações no painel do Guardian.<br>\n" +
+            "Para deixar de receber, desmarque a opção correspondente na tela de Alertas."
+    ): String = """
         <!DOCTYPE html>
         <html lang="pt-br">
         <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -69,8 +75,7 @@ class ModelosEmail {
                 </td></tr>
 
                 <tr><td style="padding:18px 28px;background:$FUNDO;border-top:1px solid $BORDA;color:$CINZA;font-size:12px;line-height:1.5;">
-                  Você recebeu este email porque ativou notificações no painel do Guardian.<br>
-                  Para deixar de receber, desmarque a opção correspondente na tela de Alertas.
+                  $rodape
                 </td></tr>
 
               </table>
@@ -209,5 +214,27 @@ class ModelosEmail {
         """.trimIndent()
 
         return moldura("Teste de notificação", "#059669", conteudo)
+    }
+
+    /** Mensagem enviada pelo formulário "Entre em contato" da landing page. */
+    fun contatoLanding(nome: String, email: String, mensagem: String): String {
+        val mensagemHtml = escapar(mensagem).replace("\n", "<br>")
+        val conteudo = """
+            <p style="margin:0 0 20px;">Nova mensagem recebida pelo formulário de contato do site.</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid $BORDA;border-radius:8px;margin-bottom:20px;">
+              ${linhaDetalhe("Nome", escapar(nome))}
+              ${linhaDetalhe("E-mail", escapar(email))}
+              ${linhaDetalhe("Recebida em", HORA.format(Instant.now()))}
+            </table>
+            <div style="padding:16px;border-left:4px solid #1D4ED8;background:$FUNDO;border-radius:6px;white-space:normal;">$mensagemHtml</div>
+            <p style="margin:20px 0 0;color:$CINZA;font-size:13px;">Clique em <strong>Responder</strong> para falar direto com ${escapar(nome)}.</p>
+        """.trimIndent()
+
+        return moldura(
+            "Contato pelo site",
+            "#1D4ED8",
+            conteudo,
+            "Mensagem enviada pelo formulário de contato da landing page do Guardian."
+        )
     }
 }
