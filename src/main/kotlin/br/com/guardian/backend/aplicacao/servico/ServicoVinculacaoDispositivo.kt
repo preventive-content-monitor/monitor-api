@@ -8,6 +8,7 @@ import br.com.guardian.backend.dominio.modelo.Dispositivo
 import br.com.guardian.backend.dominio.modelo.SeveridadeAlerta
 import br.com.guardian.backend.dominio.modelo.TipoAlerta
 import org.springframework.stereotype.Service
+import java.security.SecureRandom
 import java.time.Instant
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -20,14 +21,26 @@ class ServicoVinculacaoDispositivo(
 ) {
 
     private val codigosVinculacao = ConcurrentHashMap<String, Pair<UUID, Instant>>()
+    private val aleatorio = SecureRandom()
+    private val alfabeto = "abcdefghjkmnpqrstuvwxyz23456789"
 
-    fun gerarCodigoVinculacao(dependenteId: UUID): String {
-        val codigo = UUID.randomUUID().toString().substring(0, 6)
-        codigosVinculacao[codigo] = Pair(dependenteId, Instant.now().plusSeconds(300))
-        return codigo
+    fun gerarCodigoVinculacao(dependenteId: UUID, usuarioId: UUID): String {
+        val dependente = dependenteRepositorio.findById(dependenteId)
+            .orElseThrow { DependenteNaoEncontradoExcecao() }
+        if (dependente.usuarioGuardian.id != usuarioId) throw DependenteNaoEncontradoExcecao()
+
+        val agora = Instant.now()
+        codigosVinculacao.entries.removeIf { it.value.second.isBefore(agora) }
+        val entrada = Pair(dependenteId, agora.plusSeconds(300))
+        while (true) {
+            val codigo = buildString {
+                repeat(6) { append(alfabeto[aleatorio.nextInt(alfabeto.length)]) }
+            }
+            if (codigosVinculacao.putIfAbsent(codigo, entrada) == null) return codigo
+        }
     }
 
-    fun vincularDispositivo(codigo: String, nomeDispositivo: String): Dispositivo {
+    fun vincularDispositivo(codigo: String, nomeDispositivo: String, usuarioId: UUID): Dispositivo {
         val entrada = codigosVinculacao[codigo]
             ?: throw CodigoVinculacaoInvalidoExcecao("Código de vinculação inválido")
 
@@ -40,13 +53,14 @@ class ServicoVinculacaoDispositivo(
 
         val dependente = dependenteRepositorio.findById(dependenteId)
             .orElseThrow { DependenteNaoEncontradoExcecao() }
+        if (dependente.usuarioGuardian.id != usuarioId || !codigosVinculacao.remove(codigo, entrada)) {
+            throw CodigoVinculacaoInvalidoExcecao("Código de vinculação inválido")
+        }
 
         val dispositivo = Dispositivo(
             dependente = dependente,
             nomeDispositivo = nomeDispositivo
         )
-
-        codigosVinculacao.remove(codigo)
 
         val salvo = dispositivoRepositorio.save(dispositivo)
 

@@ -188,22 +188,21 @@ HTTP Request
 
 ## Deploy em Produção (AWS)
 
-O backend é executado em uma EC2 `t3.micro` com Amazon Linux 2023, provisionada via Terraform.
+O backend é executado em uma EC2 Ubuntu e acessado por HTTPS através do nginx.
 
 ### Infraestrutura
 
 | Componente | Detalhes |
 |------------|---------|
-| **EC2** | t3.micro, Amazon Linux 2023, `LabInstanceProfile` |
-| **nginx** | Porta 80 — serve o dashboard e faz proxy `/api/` → `:8080` |
-| **Spring Boot** | Porta 8080 (interno), gerenciado pelo systemd (`guardian.service`) |
-| **RDS** | MySQL 8.0, subnet privada, acesso apenas via VPC |
-| **JAR** | Armazenado em `s3://guardian-logs-<account>/app/backend.jar` |
+| **EC2** | Ubuntu, `LabInstanceProfile` |
+| **nginx** | HTTPS na porta 443; HTTP redireciona para HTTPS e atende aos desafios ACME |
+| **Spring Boot** | `127.0.0.1:8080`, gerenciado pelo systemd (`guardian-backend.service`) |
+| **MySQL** | EC2 em subnet privada, acessível apenas pela VPC |
 
 ### URL de Produção
 
 ```
-http://<EC2-IP>/api          ← Elastic IP atribuído pelo Terraform
+https://<EC2-IP>/api          ← Elastic IP com certificado válido
 ```
 
 Obtenha com: `terraform output backend_api_url`
@@ -212,40 +211,26 @@ Obtenha com: `terraform output backend_api_url`
 
 | Variável | Fonte |
 |----------|-------|
-| `DB_URL` | JDBC URL do RDS MySQL (injetada pelo `ec2_userdata.sh`) |
-| `DB_USERNAME` | Usuário master do RDS |
-| `DB_PASSWORD` | Senha do RDS |
-| `JWT` | Segredo para assinar tokens JWT |
+| `DB_URL` | JDBC URL do MySQL privado |
+| `DB_USERNAME` | Usuário do banco |
+| `DB_PASSWORD` | Senha do banco, obrigatória |
+| `JWT` | Segredo de assinatura obrigatório, armazenado no servidor com acesso restrito |
+| `SERVER_ADDRESS` | Opcional; padrão `127.0.0.1` |
 
 ### Build e Deploy
 
 ```powershell
-# 1. Build do JAR
-cd monitor-api
-./mvnw clean package -DskipTests
-
-# 2. Upload para S3
-aws s3 cp target/backend-0.1.0.jar s3://guardian-logs-750476866422/app/backend.jar
-
-# 3. Aplicar infraestrutura (EC2 baixa o JAR automaticamente via userdata)
-cd ../terraform
-terraform apply
+# No diretório do projeto de infraestrutura:
+.\infra\7° - deploy-backend\deploy.bat
 ```
 
-### Integração com Lambda Classificadora
-
-O backend **não classifica eventos diretamente**. A classificação de URLs é feita pela Lambda `guardian-classificador` (Python 3.12 + OpenAI gpt-4o-mini), que:
-1. Consome eventos do SQS (`guardian-eventos`)
-2. Classifica via OpenAI com cache 24h e pré-filtro local
-3. Persiste o resultado diretamente no RDS MySQL via PyMySQL
-
-O `ClienteClassificador.kt` no Spring Boot existe para casos de classificação síncrona, mas o fluxo principal é assíncrono via Lambda.
+A extensão envia eventos autenticados diretamente ao backend por HTTPS.
 
 ---
 
 ## Base URL
 
-**Produção:** `http://<EC2-IP>/api` (ver `terraform output backend_api_url`)
+**Produção:** `https://<EC2-IP>/api`
 
 **Desenvolvimento local:** `http://localhost:8080`
 
@@ -262,9 +247,22 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ### Endpoints Públicos (sem autenticação)
 - `POST /api/autenticacao/registrar`
 - `POST /api/autenticacao/entrar`
-- `POST /api/eventos/lote`
-- `POST /api/dispositivos/vincular`
-- `GET  /api/politica/atual`
+- `POST /api/autenticacao/entrar-configuracao`
+- `POST /api/autenticacao/entrar-vinculo`
+
+| Escopo | Validade | Uso |
+|--------|----------|-----|
+| `responsavel` | 24 horas | Painel e administração da conta |
+| `configuracao` | 30 minutos | Cadastro inicial e autorização de vínculo, sem acesso ao painel |
+| `vinculacao` | 10 minutos | Vincular ou reautorizar um dispositivo da conta |
+| `dispositivo` | 365 dias, renovável | Enviar eventos e consultar a política do próprio dispositivo |
+
+Ao configurar o computador do menor, o servidor revoga **todas** as sessões de
+responsável daquela conta, inclusive em outros computadores; as credenciais de
+dispositivo continuam ativas. O responsável precisa entrar novamente no painel.
+O logout revoga a sessão no servidor. A atualização que introduziu esses escopos
+invalida tokens antigos; extensões instaladas anteriormente precisam ser
+atualizadas e reautorizadas, sem recriar seus dispositivos.
 
 ### Endpoints Protegidos (requer JWT)
 - `GET  /api/dependentes`
@@ -272,6 +270,10 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 - `GET  /api/dependentes/{id}`
 - `GET  /api/dispositivos`
 - `POST /api/dispositivos/gerar-codigo/{dependenteId}`
+- `POST /api/dispositivos/vincular` — escopo `vinculacao`
+- `POST /api/eventos/lote` — escopo `dispositivo`
+- `GET  /api/politica/atual` — responsável dono ou próprio dispositivo
+- `POST /api/autenticacao/sair` — revoga a credencial apresentada
 - `PUT  /api/politica`
 - `GET  /api/painel/resumo`
 - `GET  /api/painel/top-dominios`
@@ -479,7 +481,8 @@ Gera código de vinculação (válido por 5 minutos). **Requer autenticação.**
 ---
 
 #### POST /api/dispositivos/vincular
-Vincula dispositivo usando o código. **Endpoint público** (usado pela extensão).
+Vincula dispositivo usando o código e uma credencial temporária com escopo
+`vinculacao`, da mesma conta que gerou o código.
 
 **Request:**
 ```json
@@ -493,13 +496,10 @@ Vincula dispositivo usando o código. **Endpoint público** (usado pela extensã
 ```json
 {
   "id": "660e8400-e29b-41d4-a716-446655440001",
-  "dependente": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "apelido": "João"
-  },
   "nomeDispositivo": "Chrome - Windows 11",
   "vinculadoEm": "2026-02-22T10:05:00Z",
-  "ultimoAcessoEm": null
+  "apelidoDependente": "João",
+  "tokenDispositivo": "<credencial-limitada>"
 }
 ```
 
@@ -534,7 +534,8 @@ Lista dispositivos do responsável autenticado.
 ### 4. Eventos (Ingestão)
 
 #### POST /api/eventos/lote
-**ENDPOINT PRINCIPAL PARA A EXTENSÃO.** Envia lote de eventos de navegação. **Não requer autenticação** (apenas `dispositivoId` válido).
+**ENDPOINT PRINCIPAL PARA A EXTENSÃO.** Envia eventos de navegação e exige a
+credencial de dispositivo correspondente ao `dispositivoId`.
 
 **Request:**
 ```json
@@ -592,7 +593,7 @@ Lista dispositivos do responsável autenticado.
 ### 5. Políticas
 
 #### GET /api/politica/atual
-Obtém política ativa para um dispositivo. **Endpoint público.**
+Obtém a política ativa para o próprio dispositivo ou para o responsável dono.
 
 **Query Parameters:**
 | Param | Tipo | Descrição |
@@ -800,14 +801,15 @@ Para erros de validação, `detalhes` contém a lista de campos:
        │   na extensão      │                   │
        │                    │                   │
        │                    │ POST /api/dispositivos/vincular
-       │                    │ { codigo, nomeDispositivo }
+       │                    │ { codigo, nomeDispositivo } + autorização de vínculo
        │                    │◀──────────────────│
        │                    │                   │
        │                    │ Dispositivo       │
        │                    │ vinculado         │
        │                    │──────────────────▶│
        │                    │                   │
-       │                    │  Salva deviceId   │
+       │                    │  Salva deviceId e │
+       │                    │  token limitado   │
        │                    │  localmente       │
        └────────────────────┴───────────────────┘
 ```
@@ -817,8 +819,9 @@ Para erros de validação, `detalhes` contém a lista de campos:
 ```javascript
 // background.js da extensão
 
-const DEVICE_ID = localStorage.getItem('guardian_device_id');
-const API_URL = 'http://localhost:8080';
+const { deviceId: DEVICE_ID, deviceToken: DEVICE_TOKEN } =
+  await chrome.storage.local.get(['deviceId', 'deviceToken']);
+const API_URL = 'https://<EC2-IP>';
 
 let eventBuffer = [];
 
@@ -848,7 +851,7 @@ setInterval(async () => {
   try {
     const response = await fetch(`${API_URL}/api/eventos/lote`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEVICE_TOKEN}` },
       body: JSON.stringify({
         dispositivoId: DEVICE_ID,
         eventos: eventsToSend
@@ -869,7 +872,8 @@ setInterval(async () => {
 ```javascript
 async function verificarBloqueio(url) {
   const response = await fetch(
-    `${API_URL}/api/politica/atual?dispositivoId=${DEVICE_ID}`
+    `${API_URL}/api/politica/atual?dispositivoId=${DEVICE_ID}`,
+    { headers: { Authorization: `Bearer ${DEVICE_TOKEN}` } }
   );
   
   if (!response.ok) return { bloqueado: false };
@@ -892,7 +896,7 @@ async function verificarBloqueio(url) {
 async function reportarBloqueio(url, motivo) {
   await fetch(`${API_URL}/api/eventos/lote`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEVICE_TOKEN}` },
     body: JSON.stringify({
       dispositivoId: DEVICE_ID,
       eventos: [{
@@ -929,13 +933,13 @@ http://localhost:8080/swagger-ui/index.html
 CREATE DATABASE guardian;
 ```
 
-### Variáveis de Ambiente (opcionais)
+### Variáveis de Ambiente
 | Variável | Padrão | Descrição |
 |----------|--------|-----------|
 | `DB_URL` | `jdbc:mysql://localhost:3306/guardian?...` | URL do banco |
 | `DB_USERNAME` | `root` | Usuário do banco |
-| `DB_PASSWORD` | `urubu100` | Senha do banco |
-| `JWT` | `guardian-super-secret-key-2026-secure` | Segredo JWT |
+| `DB_PASSWORD` | Obrigatória | Senha do banco |
+| `JWT` | Obrigatória | Segredo JWT aleatório, com pelo menos 32 bytes |
 
 ### Build e execução
 ```bash

@@ -7,6 +7,7 @@ import br.com.guardian.backend.aplicacao.porta.entrada.ServicoAutenticacao
 import br.com.guardian.backend.aplicacao.porta.entrada.ValidadorUsuario
 import br.com.guardian.backend.adaptadores.saida.persistencia.UsuarioRepositorio
 import br.com.guardian.backend.dominio.modelo.UsuarioGuardian
+import br.com.guardian.backend.dominio.modelo.TipoCredencial
 import br.com.guardian.backend.dominio.porta.GeradorToken
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -30,9 +31,9 @@ class ServicoAutenticacaoImpl(
         usuarioRepositorio.save(usuario)
     }
 
-    override fun autenticar(requisicao: RequisicaoLogin): RespostaAutenticacao {
+    override fun autenticar(requisicao: RequisicaoLogin, tipo: TipoCredencial): RespostaAutenticacao {
         val usuario = validadorUsuario.validarLogin(requisicao)
-        val token = geradorToken.gerarToken(usuario)
+        val token = geradorToken.gerarToken(usuario, tipo)
         return RespostaAutenticacao(token)
     }
 }

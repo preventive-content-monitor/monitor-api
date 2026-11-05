@@ -3,9 +3,14 @@ package br.com.guardian.backend.adaptadores.entrada.rest
 import br.com.guardian.backend.adaptadores.entrada.dto.RespostaDispositivo
 import br.com.guardian.backend.adaptadores.entrada.dto.RequisicaoVinculacao
 import br.com.guardian.backend.adaptadores.entrada.dto.RespostaErro
+import br.com.guardian.backend.adaptadores.entrada.dto.RespostaAutenticacao
+import br.com.guardian.backend.adaptadores.entrada.dto.RespostaVinculacao
 import br.com.guardian.backend.adaptadores.saida.persistencia.DispositivoRepositorio
+import br.com.guardian.backend.aplicacao.servico.ServicoAutorizacaoDispositivo
+import br.com.guardian.backend.aplicacao.servico.ServicoSessao
 import br.com.guardian.backend.aplicacao.servico.ServicoVinculacaoDispositivo
 import br.com.guardian.backend.dominio.modelo.Dispositivo
+import br.com.guardian.backend.dominio.porta.GeradorToken
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.ArraySchema
 import io.swagger.v3.oas.annotations.media.Content
@@ -16,6 +21,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import java.util.*
 
@@ -25,7 +32,10 @@ import java.util.*
 @SecurityRequirement(name = "bearerAuth")
 class DispositivoController(
     private val servicoVinculacao: ServicoVinculacaoDispositivo,
-    private val dispositivoRepositorio: DispositivoRepositorio
+    private val dispositivoRepositorio: DispositivoRepositorio,
+    private val autorizacao: ServicoAutorizacaoDispositivo,
+    private val geradorToken: GeradorToken,
+    private val servicoSessao: ServicoSessao
 ) {
 
     @GetMapping
@@ -113,8 +123,11 @@ class DispositivoController(
             )
         ]
     )
-    fun gerarCodigo(@PathVariable dependenteId: UUID): Map<String, String> {
-        val codigo = servicoVinculacao.gerarCodigoVinculacao(dependenteId)
+    fun gerarCodigo(
+        @PathVariable dependenteId: UUID,
+        @AuthenticationPrincipal principal: Jwt
+    ): Map<String, String> {
+        val codigo = servicoVinculacao.gerarCodigoVinculacao(dependenteId, UUID.fromString(principal.subject))
         return mapOf("codigo" to codigo)
     }
 
@@ -129,7 +142,7 @@ class DispositivoController(
             ApiResponse(
                 responseCode = "201",
                 description = "Dispositivo vinculado com sucesso",
-                content = [Content(schema = Schema(implementation = Dispositivo::class))]
+                content = [Content(schema = Schema(implementation = RespostaVinculacao::class))]
             ),
             ApiResponse(
                 responseCode = "400",
@@ -143,7 +156,43 @@ class DispositivoController(
             )
         ]
     )
-    fun vincular(@RequestBody requisicao: RequisicaoVinculacao): Dispositivo {
-        return servicoVinculacao.vincularDispositivo(requisicao.codigo, requisicao.nomeDispositivo)
+    @Transactional
+    fun vincular(
+        @RequestBody requisicao: RequisicaoVinculacao,
+        @AuthenticationPrincipal principal: Jwt
+    ): RespostaVinculacao {
+        val dispositivo = servicoVinculacao.vincularDispositivo(
+            requisicao.codigo.trim().lowercase(),
+            requisicao.nomeDispositivo,
+            UUID.fromString(principal.subject)
+        )
+        val token = geradorToken.gerarTokenDispositivo(dispositivo.id)
+        servicoSessao.encerrar(principal)
+        return RespostaVinculacao(
+            dispositivo.id,
+            dispositivo.nomeDispositivo,
+            dispositivo.vinculadoEm,
+            dispositivo.dependente.apelido,
+            token
+        )
+    }
+
+    @PostMapping("/{dispositivoId}/credencial")
+    @Transactional
+    fun autorizarDispositivoExistente(
+        @PathVariable dispositivoId: UUID,
+        @AuthenticationPrincipal principal: Jwt
+    ): RespostaAutenticacao {
+        autorizacao.verificar(dispositivoId, principal, permiteResponsavel = true)
+        val token = geradorToken.gerarTokenDispositivo(dispositivoId)
+        servicoSessao.encerrar(principal)
+        return RespostaAutenticacao(token)
+    }
+
+    @PostMapping("/renovar-credencial")
+    fun renovarCredencial(@AuthenticationPrincipal principal: Jwt): RespostaAutenticacao {
+        val dispositivoId = UUID.fromString(principal.subject)
+        autorizacao.verificar(dispositivoId, principal)
+        return RespostaAutenticacao(geradorToken.gerarTokenDispositivo(dispositivoId))
     }
 }

@@ -1,6 +1,7 @@
 package br.com.guardian.backend.dominio.modelo
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.persistence.*
 import java.time.Instant
 import java.util.*
@@ -17,6 +18,7 @@ class UsuarioGuardian(
     val email: String,
 
     @Column(name = "hash_senha", nullable = false)
+    @get:JsonIgnore
     var senhaHash: String,
 
     @Enumerated(EnumType.STRING)

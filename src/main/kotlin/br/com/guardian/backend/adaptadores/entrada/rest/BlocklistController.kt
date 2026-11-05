@@ -6,10 +6,15 @@ import br.com.guardian.backend.adaptadores.saida.persistencia.DispositivoReposit
 import br.com.guardian.backend.aplicacao.porta.entrada.ServicoPolitica
 import br.com.guardian.backend.aplicacao.servico.ServicoBlocklist
 import br.com.guardian.backend.aplicacao.servico.ServicoIngestaoEvento
+import br.com.guardian.backend.aplicacao.servico.ServicoAutorizacaoDispositivo
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.slf4j.LoggerFactory
 import org.springframework.web.bind.annotation.*
+import org.springframework.http.HttpStatus
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.web.server.ResponseStatusException
 import java.net.URI
 import java.util.*
 
@@ -20,7 +25,8 @@ class BlocklistController(
     private val servicoBlocklist: ServicoBlocklist,
     private val servicoPolitica: ServicoPolitica,
     private val clienteOpenAi: ClienteOpenAi,
-    private val dispositivoRepositorio: DispositivoRepositorio
+    private val dispositivoRepositorio: DispositivoRepositorio,
+    private val autorizacao: ServicoAutorizacaoDispositivo
 ) {
 
     private val logger = LoggerFactory.getLogger(BlocklistController::class.java)
@@ -30,7 +36,7 @@ class BlocklistController(
      * a ação que a extensão deve executar. Usado para plataformas mistas (YouTube, etc.)
      * onde o título do conteúdo só fica disponível após a página carregar.
      *
-     * Endpoint público — não requer JWT.
+     * Requer a credencial do dispositivo.
      */
     @PostMapping("/classificar-agora")
     @Operation(
@@ -38,20 +44,23 @@ class BlocklistController(
         description = "Classifica URL+título via IA (se não cacheado) e retorna se deve bloquear. Usado para plataformas mistas como YouTube."
     )
     fun classificarAgora(
-        @RequestBody corpo: Map<String, String>
+        @RequestBody corpo: Map<String, String>,
+        @AuthenticationPrincipal principal: Jwt
     ): RespostaVerificacaoBlocklist {
         val url              = corpo["url"]           ?: return RespostaVerificacaoBlocklist(acao = "ALLOW", motivo = "URL ausente")
         val titulo: String   = corpo["titulo"]        ?: ""
         val descricao: String = corpo["descricao"]    ?: ""
         val restricaoEtaria   = corpo["restricaoEtaria"] == "true"
         val categoria: String = corpo["categoria"]    ?: ""
-        val dispositivoIdStr = corpo["dispositivoId"] ?: return RespostaVerificacaoBlocklist(acao = "ALLOW", motivo = "dispositivoId ausente")
+        val dispositivoIdStr = corpo["dispositivoId"]
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "dispositivoId ausente")
 
         val dispositivoId: UUID = try {
             UUID.fromString(dispositivoIdStr)
-        } catch (e: Exception) {
-            return RespostaVerificacaoBlocklist(acao = "ALLOW", motivo = "dispositivoId invalido")
+        } catch (e: IllegalArgumentException) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "dispositivoId inválido", e)
         }
+        autorizacao.verificar(dispositivoId, principal)
 
         val host: String = try {
             URI(url).host?.lowercase()
@@ -146,8 +155,10 @@ class BlocklistController(
     )
     fun verificar(
         @RequestParam url: String,
-        @RequestParam dispositivoId: UUID
+        @RequestParam dispositivoId: UUID,
+        @AuthenticationPrincipal principal: Jwt
     ): RespostaVerificacaoBlocklist {
+        autorizacao.verificar(dispositivoId, principal)
         val host = try {
             URI(url).host?.lowercase()
         } catch (e: Exception) {

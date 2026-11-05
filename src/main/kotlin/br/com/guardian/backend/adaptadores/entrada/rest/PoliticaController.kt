@@ -4,6 +4,7 @@ import br.com.guardian.backend.adaptadores.entrada.dto.RespostaErro
 import br.com.guardian.backend.adaptadores.entrada.dto.RequisicaoAtualizarPolitica
 import br.com.guardian.backend.adaptadores.entrada.dto.RespostaPolitica
 import br.com.guardian.backend.aplicacao.porta.entrada.ServicoPolitica
+import br.com.guardian.backend.aplicacao.servico.ServicoAutorizacaoDispositivo
 import br.com.guardian.backend.dominio.modelo.Politica
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -14,6 +15,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
 import java.util.*
 
 @RestController
@@ -21,7 +24,8 @@ import java.util.*
 @Tag(name = "Políticas", description = "Gerenciamento de políticas de controle parental")
 @SecurityRequirement(name = "bearerAuth")
 class PoliticaController(
-    private val servicoPolitica: ServicoPolitica
+    private val servicoPolitica: ServicoPolitica,
+    private val autorizacao: ServicoAutorizacaoDispositivo
 ) {
 
     @GetMapping("/atual")
@@ -50,8 +54,10 @@ class PoliticaController(
     )
     fun buscarAtual(
         @Parameter(description = "ID do dispositivo", required = true)
-        @RequestParam dispositivoId: UUID
+        @RequestParam dispositivoId: UUID,
+        @AuthenticationPrincipal principal: Jwt
     ): RespostaPolitica {
+        autorizacao.verificar(dispositivoId, principal, permiteResponsavel = true)
         val politica = servicoPolitica.buscarPoliticaPorDispositivo(dispositivoId)
         return politica.paraResposta()
     }
@@ -88,8 +94,10 @@ class PoliticaController(
     fun atualizarPolitica(
         @Parameter(description = "ID do dispositivo", required = true)
         @RequestParam dispositivoId: UUID,
-        @RequestBody requisicao: RequisicaoAtualizarPolitica
+        @RequestBody requisicao: RequisicaoAtualizarPolitica,
+        @AuthenticationPrincipal principal: Jwt
     ): RespostaPolitica {
+        autorizacao.verificar(dispositivoId, principal, permiteResponsavel = true)
         val politica = servicoPolitica.atualizarPolitica(
             dispositivoId = dispositivoId,
             modo = requisicao.modo,
