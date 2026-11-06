@@ -20,4 +20,8 @@ interface SessaoCredencialRepositorio : JpaRepository<SessaoCredencial, UUID> {
         @Param("tipo") tipo: TipoCredencial,
         @Param("revogadaEm") revogadaEm: Instant
     ): Int
+
+    @Modifying
+    @Query("delete from SessaoCredencial s where s.sujeitoId in :sujeitos")
+    fun excluirPorSujeitos(@Param("sujeitos") sujeitos: Collection<UUID>): Int
 }

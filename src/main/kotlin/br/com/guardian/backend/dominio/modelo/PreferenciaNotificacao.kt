@@ -43,5 +43,6 @@ class PreferenciaNotificacao(
         // responsável iniciou — aparece no painel, mas não dispara email.
         TipoAlerta.NOVO_DISPOSITIVO   -> false
         TipoAlerta.PROTECAO           -> true
+        TipoAlerta.MAIORIDADE         -> true
     }
 }

@@ -6,4 +6,8 @@ import java.util.*
 
 interface PoliticaRepositorio : JpaRepository<Politica, UUID> {
     fun findByDependenteId(dependenteId: UUID): Politica?
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("delete from Politica p where p.dependente.id = :dependenteId")
+    fun excluirPorDependente(@org.springframework.data.repository.query.Param("dependenteId") dependenteId: UUID): Int
 }

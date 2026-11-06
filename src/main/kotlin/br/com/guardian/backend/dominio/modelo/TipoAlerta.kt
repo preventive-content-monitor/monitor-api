@@ -18,5 +18,7 @@ enum class TipoAlerta {
     RESUMO_DIARIO,
 
     /** Tentativa de burlar a proteção: extensão removida, anônimo liberado, palavra-chave errada. */
-    PROTECAO
+    PROTECAO,
+    /** Dependente está próximo ou completou a maioridade; o monitoramento é encerrado. */
+    MAIORIDADE
 }

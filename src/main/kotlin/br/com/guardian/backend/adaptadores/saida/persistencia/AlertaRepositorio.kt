@@ -58,4 +58,8 @@ interface AlertaRepositorio : JpaRepository<Alerta, UUID> {
         de: Instant,
         ate: Instant
     ): List<Alerta>
+
+    @Modifying
+    @Query("delete from Alerta a where a.dependente.id = :dependenteId")
+    fun excluirPorDependente(@Param("dependenteId") dependenteId: UUID): Int
 }

@@ -10,4 +10,8 @@ interface DispositivoRepositorio : JpaRepository<Dispositivo, UUID> {
 
     @Query("SELECT d FROM Dispositivo d WHERE d.dependente.usuarioGuardian.id = :usuarioGuardianId")
     fun buscarTodosPorUsuarioGuardianId(usuarioGuardianId: UUID): List<Dispositivo>
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("delete from Dispositivo d where d.dependente.id = :dependenteId")
+    fun excluirPorDependente(@org.springframework.data.repository.query.Param("dependenteId") dependenteId: UUID): Int
 }

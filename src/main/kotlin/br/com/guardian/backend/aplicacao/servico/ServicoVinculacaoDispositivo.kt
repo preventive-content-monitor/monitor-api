@@ -28,6 +28,11 @@ class ServicoVinculacaoDispositivo(
         val dependente = dependenteRepositorio.findById(dependenteId)
             .orElseThrow { DependenteNaoEncontradoExcecao() }
         if (dependente.usuarioGuardian.id != usuarioId) throw DependenteNaoEncontradoExcecao()
+        if (dependente.monitoramentoEncerrado) {
+            throw br.com.guardian.backend.dominio.excecao.RequisicaoInvalidaExcecao(
+                "${dependente.apelido} completou ${br.com.guardian.backend.dominio.modelo.Dependente.IDADE_LIMITE} anos; o monitoramento foi encerrado."
+            )
+        }
 
         val agora = Instant.now()
         codigosVinculacao.entries.removeIf { it.value.second.isBefore(agora) }

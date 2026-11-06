@@ -15,4 +15,8 @@ interface VulnerabilidadeRepositorio :
         from: LocalDate,
         to: LocalDate
     ): List<VulnerabilidadeDiaria>
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("delete from VulnerabilidadeDiaria v where v.dependente.id = :dependenteId")
+    fun excluirPorDependente(@org.springframework.data.repository.query.Param("dependenteId") dependenteId: UUID): Int
 }

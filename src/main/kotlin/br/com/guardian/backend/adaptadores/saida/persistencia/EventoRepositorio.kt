@@ -137,4 +137,8 @@ interface EventoRepositorio : JpaRepository<Evento, UUID> {
     """
     )
     fun rotulosDisponiveis(@Param("dispositivoId") dispositivoId: UUID): List<String>
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("delete from Evento e where e.dispositivo.id in (select d.id from Dispositivo d where d.dependente.id = :dependenteId)")
+    fun excluirPorDependente(@org.springframework.data.repository.query.Param("dependenteId") dependenteId: UUID): Int
 }

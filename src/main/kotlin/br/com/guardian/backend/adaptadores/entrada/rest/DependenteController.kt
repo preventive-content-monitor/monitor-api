@@ -3,9 +3,8 @@ package br.com.guardian.backend.adaptadores.entrada.rest
 import br.com.guardian.backend.adaptadores.entrada.dto.RequisicaoCriarDependente
 import br.com.guardian.backend.adaptadores.entrada.dto.RespostaErro
 import br.com.guardian.backend.adaptadores.saida.persistencia.DependenteRepositorio
-import br.com.guardian.backend.adaptadores.saida.persistencia.UsuarioRepositorio
+import br.com.guardian.backend.aplicacao.servico.ServicoDependente
 import br.com.guardian.backend.dominio.excecao.DependenteNaoEncontradoExcecao
-import br.com.guardian.backend.dominio.excecao.UsuarioNaoEncontradoExcecao
 import br.com.guardian.backend.dominio.modelo.Dependente
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.ArraySchema
@@ -26,7 +25,7 @@ import java.util.*
 @SecurityRequirement(name = "bearerAuth")
 class DependenteController(
     private val dependenteRepositorio: DependenteRepositorio,
-    private val usuarioRepositorio: UsuarioRepositorio
+    private val servicoDependente: ServicoDependente
 ) {
 
     @PostMapping
@@ -47,16 +46,41 @@ class DependenteController(
         @AuthenticationPrincipal principal: org.springframework.security.oauth2.jwt.Jwt
     ): Dependente {
         val usuarioId = UUID.fromString(principal.subject)
-        val usuario = usuarioRepositorio.findById(usuarioId)
-            .orElseThrow { UsuarioNaoEncontradoExcecao() }
-        val dependente = Dependente(
-            usuarioGuardian = usuario,
-            apelido = requisicao.apelido,
-            anoNascimento = requisicao.dataNascimento.year,
-            dataNascimento = requisicao.dataNascimento,
-            sexo = requisicao.sexo
-        )
-        return dependenteRepositorio.save(dependente)
+        return servicoDependente.criar(usuarioId, requisicao.apelido, requisicao.dataNascimento, requisicao.sexo)
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Editar dependente", description = "Altera nome, data de nascimento e sexo de um dependente do responsável")
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Dependente atualizado", content = [Content(schema = Schema(implementation = Dependente::class))]),
+            ApiResponse(responseCode = "400", description = "Dados inválidos ou idade fora do escopo", content = [Content(schema = Schema(implementation = RespostaErro::class))]),
+            ApiResponse(responseCode = "404", description = "Dependente não encontrado", content = [Content(schema = Schema(implementation = RespostaErro::class))])
+        ]
+    )
+    fun atualizar(
+        @PathVariable id: UUID,
+        @RequestBody requisicao: RequisicaoCriarDependente,
+        @AuthenticationPrincipal principal: org.springframework.security.oauth2.jwt.Jwt
+    ): Dependente {
+        val usuarioId = UUID.fromString(principal.subject)
+        return servicoDependente.atualizar(usuarioId, id, requisicao.apelido, requisicao.dataNascimento, requisicao.sexo)
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Excluir dependente", description = "Exclui o dependente, desconecta seus computadores e apaga histórico, alertas e regras")
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "Dependente excluído"),
+            ApiResponse(responseCode = "404", description = "Dependente não encontrado", content = [Content(schema = Schema(implementation = RespostaErro::class))])
+        ]
+    )
+    fun excluir(
+        @PathVariable id: UUID,
+        @AuthenticationPrincipal principal: org.springframework.security.oauth2.jwt.Jwt
+    ) {
+        servicoDependente.excluir(UUID.fromString(principal.subject), id)
     }
 
     @GetMapping

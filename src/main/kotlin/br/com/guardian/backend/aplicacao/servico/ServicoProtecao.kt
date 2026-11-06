@@ -176,6 +176,8 @@ class ServicoProtecao(
         dispositivo.removidoEm = Instant.now()
         dispositivoRepositorio.save(dispositivo)
         sessoes.revogarSessoes(dispositivoId, TipoCredencial.DISPOSITIVO, Instant.now())
+        // Após a maioridade, remover a extensão é esperado e não deve alarmar o responsável.
+        if (dispositivo.dependente.monitoramentoEncerrado) return true
         servicoAlerta.registrar(
             usuario = dispositivo.dependente.usuarioGuardian,
             dependente = dispositivo.dependente,

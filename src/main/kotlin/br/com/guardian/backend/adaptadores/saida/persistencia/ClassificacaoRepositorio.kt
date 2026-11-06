@@ -33,4 +33,8 @@ interface ClassificacaoRepositorio : JpaRepository<ResultadoClassificacao, UUID>
         @Param("desde") desde: Instant,
         pageable: Pageable
     ): List<ResultadoClassificacao>
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("delete from ResultadoClassificacao c where c.evento.id in (select e.id from Evento e where e.dispositivo.id in (select d.id from Dispositivo d where d.dependente.id = :dependenteId))")
+    fun excluirPorDependente(@org.springframework.data.repository.query.Param("dependenteId") dependenteId: UUID): Int
 }
