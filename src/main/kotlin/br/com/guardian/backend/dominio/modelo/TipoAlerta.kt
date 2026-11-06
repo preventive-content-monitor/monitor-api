@@ -15,5 +15,8 @@ enum class TipoAlerta {
     NOVO_DISPOSITIVO,
 
     /** Resumo diário consolidado enviado por email. */
-    RESUMO_DIARIO
+    RESUMO_DIARIO,
+
+    /** Tentativa de burlar a proteção: extensão removida, anônimo liberado, palavra-chave errada. */
+    PROTECAO
 }

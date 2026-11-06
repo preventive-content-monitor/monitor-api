@@ -42,5 +42,6 @@ class PreferenciaNotificacao(
         // Vinculação de dispositivo é informativa e parte do fluxo que o próprio
         // responsável iniciou — aparece no painel, mas não dispara email.
         TipoAlerta.NOVO_DISPOSITIVO   -> false
+        TipoAlerta.PROTECAO           -> true
     }
 }

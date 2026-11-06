@@ -70,7 +70,10 @@ class DispositivoController(
                 dependenteId = dispositivo.dependente.id,
                 apelidoDependente = dispositivo.dependente.apelido,
                 vinculadoEm = dispositivo.vinculadoEm,
-                ultimoAcessoEm = dispositivo.ultimoAcessoEm
+                ultimoAcessoEm = dispositivo.ultimoAcessoEm,
+                ultimoSinalEm = dispositivo.ultimoSinalEm,
+                anonimoPermitido = dispositivo.anonimoPermitido,
+                removidoEm = dispositivo.removidoEm
             )
         }
     }

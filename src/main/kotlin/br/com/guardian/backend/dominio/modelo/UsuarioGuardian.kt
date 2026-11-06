@@ -26,5 +26,10 @@ class UsuarioGuardian(
     val papel: PapelUsuario = PapelUsuario.RESPONSAVEL,
 
     @Column(name = "criado_em", nullable = false)
-    val criadoEm: Instant = Instant.now()
+    val criadoEm: Instant = Instant.now(),
+
+    /** Hash BCrypt da palavra-chave que destrava a extensão no computador do menor. */
+    @Column(name = "hash_palavra_chave")
+    @get:JsonIgnore
+    var palavraChaveHash: String? = null
 )

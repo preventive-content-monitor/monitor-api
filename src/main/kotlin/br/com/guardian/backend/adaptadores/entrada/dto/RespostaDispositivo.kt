@@ -26,5 +26,14 @@ data class RespostaDispositivo(
     val vinculadoEm: Instant,
 
     @Schema(description = "Última vez que o dispositivo foi visto")
-    val ultimoAcessoEm: Instant?
+    val ultimoAcessoEm: Instant?,
+
+    @Schema(description = "Último sinal de vida da extensão")
+    val ultimoSinalEm: Instant? = null,
+
+    @Schema(description = "Se a extensão protege também as janelas anônimas")
+    val anonimoPermitido: Boolean? = null,
+
+    @Schema(description = "Quando a extensão foi removida do navegador")
+    val removidoEm: Instant? = null
 )

@@ -24,5 +24,20 @@ class Dispositivo(
     val vinculadoEm: Instant = Instant.now(),
 
     @Column(name = "ultimo_acesso_em")
-    var ultimoAcessoEm: Instant? = null
+    var ultimoAcessoEm: Instant? = null,
+
+    /** Último "sinal de vida" enviado pela extensão. */
+    @Column(name = "ultimo_sinal_em")
+    var ultimoSinalEm: Instant? = null,
+
+    /** Se a extensão também está ativa nas janelas anônimas. */
+    @Column(name = "anonimo_permitido")
+    var anonimoPermitido: Boolean? = null,
+
+    @Column(name = "versao_extensao", length = 20)
+    var versaoExtensao: String? = null,
+
+    /** Quando a extensão foi removida do navegador (detectado pela URL de desinstalação). */
+    @Column(name = "removido_em")
+    var removidoEm: Instant? = null
 )

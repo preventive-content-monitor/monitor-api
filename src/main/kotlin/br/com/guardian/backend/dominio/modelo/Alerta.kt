@@ -32,6 +32,7 @@ class Alerta(
     val dependente: Dependente? = null,
 
     @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.VARCHAR)
     @Column(name = "tipo", nullable = false, length = 40)
     val tipo: TipoAlerta,
 

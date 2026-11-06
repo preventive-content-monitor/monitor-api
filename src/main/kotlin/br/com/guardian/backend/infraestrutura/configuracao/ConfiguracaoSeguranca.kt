@@ -43,6 +43,7 @@ class ConfiguracaoSeguranca {
         AntPathRequestMatcher("/api/autenticacao/entrar-configuracao"),
         AntPathRequestMatcher("/api/autenticacao/entrar-vinculo"),
         AntPathRequestMatcher("/api/contato", "POST"),
+        AntPathRequestMatcher("/api/protecao/removida", "GET"),
         AntPathRequestMatcher("/v3/api-docs/**"),
         AntPathRequestMatcher("/v3/api-docs"),
         AntPathRequestMatcher("/swagger-ui.html"),
@@ -89,6 +90,12 @@ class ConfiguracaoSeguranca {
                     .hasAnyAuthority("SCOPE_responsavel", "SCOPE_configuracao")
                     .requestMatchers(HttpMethod.GET, "/api/politica/atual")
                     .hasAnyAuthority("SCOPE_responsavel", "SCOPE_dispositivo")
+                    .requestMatchers(HttpMethod.GET, "/api/protecao/palavra-chave")
+                    .hasAnyAuthority("SCOPE_responsavel", "SCOPE_configuracao", "SCOPE_vinculacao", "SCOPE_dispositivo")
+                    .requestMatchers(HttpMethod.PUT, "/api/protecao/palavra-chave")
+                    .hasAnyAuthority("SCOPE_responsavel", "SCOPE_configuracao", "SCOPE_vinculacao")
+                    .requestMatchers(HttpMethod.POST, "/api/protecao/verificar", "/api/protecao/desconectar", "/api/protecao/sinal")
+                    .hasAuthority("SCOPE_dispositivo")
                     .requestMatchers("/api/eventos/**", "/api/blocklist/**")
                     .hasAuthority("SCOPE_dispositivo")
                     .anyRequest().hasAuthority("SCOPE_responsavel")
