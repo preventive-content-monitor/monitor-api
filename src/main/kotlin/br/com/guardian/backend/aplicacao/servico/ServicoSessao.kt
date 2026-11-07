@@ -2,7 +2,6 @@ package br.com.guardian.backend.aplicacao.servico
 
 import br.com.guardian.backend.adaptadores.entrada.dto.RespostaAutenticacao
 import br.com.guardian.backend.adaptadores.entrada.dto.RequisicaoLogin
-import br.com.guardian.backend.adaptadores.saida.persistencia.SessaoCredencialRepositorio
 import br.com.guardian.backend.adaptadores.saida.persistencia.UsuarioRepositorio
 import br.com.guardian.backend.aplicacao.porta.entrada.ValidadorUsuario
 import br.com.guardian.backend.dominio.excecao.NaoAutorizadoExcecao
@@ -20,7 +19,6 @@ import java.util.UUID
 class ServicoSessao(
     private val usuarioRepositorio: UsuarioRepositorio,
     private val geradorToken: GeradorToken,
-    private val sessoes: SessaoCredencialRepositorio,
     private val validadorUsuario: ValidadorUsuario
 ) {
     @Transactional
@@ -28,14 +26,14 @@ class ServicoSessao(
         val usuario = usuarioRepositorio.findById(UUID.fromString(principal.subject))
             .orElseThrow { UsuarioNaoEncontradoExcecao() }
         val token = geradorToken.gerarToken(usuario, TipoCredencial.CONFIGURACAO)
-        revogarSessoesResponsavel(usuario.id)
+        // Só a sessão deste computador vira configuração; as dos outros PCs do responsável continuam.
+        geradorToken.revogarToken(UUID.fromString(principal.id))
         return RespostaAutenticacao(token)
     }
 
     @Transactional
     fun autenticarConfiguracao(requisicao: RequisicaoLogin): RespostaAutenticacao {
         val usuario = validadorUsuario.validarLogin(requisicao)
-        revogarSessoesResponsavel(usuario.id)
         return RespostaAutenticacao(geradorToken.gerarToken(usuario, TipoCredencial.CONFIGURACAO))
     }
 
@@ -65,10 +63,6 @@ class ServicoSessao(
     @Transactional
     fun encerrar(principal: Jwt) {
         geradorToken.revogarToken(UUID.fromString(principal.id))
-    }
-
-    private fun revogarSessoesResponsavel(usuarioId: UUID) {
-        sessoes.revogarSessoes(usuarioId, TipoCredencial.RESPONSAVEL, Instant.now())
     }
 
     private companion object {
