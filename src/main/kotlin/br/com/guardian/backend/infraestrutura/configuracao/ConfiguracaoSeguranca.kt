@@ -78,6 +78,8 @@ class ConfiguracaoSeguranca {
                 it.requestMatchers(HttpMethod.POST, "/api/autenticacao/sair").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/autenticacao/sessao-menor")
                     .hasAuthority("SCOPE_responsavel")
+                    .requestMatchers(HttpMethod.POST, "/api/autenticacao/retomar-responsavel")
+                    .hasAuthority("SCOPE_configuracao")
                     .requestMatchers(HttpMethod.POST, "/api/autenticacao/autorizacao-vinculo")
                     .hasAnyAuthority("SCOPE_responsavel", "SCOPE_configuracao")
                     .requestMatchers(HttpMethod.POST, "/api/dispositivos/vincular", "/api/dispositivos/*/credencial")

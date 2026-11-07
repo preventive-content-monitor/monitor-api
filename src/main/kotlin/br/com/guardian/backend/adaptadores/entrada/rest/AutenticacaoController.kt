@@ -89,6 +89,10 @@ class AutenticacaoController(
     fun iniciarConfiguracao(@AuthenticationPrincipal principal: Jwt): RespostaAutenticacao =
         servicoSessao.iniciarConfiguracao(principal)
 
+    @PostMapping("/retomar-responsavel")
+    fun retomarResponsavel(@AuthenticationPrincipal principal: Jwt): RespostaAutenticacao =
+        servicoSessao.retomarResponsavel(principal)
+
     @PostMapping("/autorizacao-vinculo")
     fun autorizarVinculacao(@AuthenticationPrincipal principal: Jwt): RespostaAutenticacao =
         servicoSessao.autorizarVinculacao(principal)
