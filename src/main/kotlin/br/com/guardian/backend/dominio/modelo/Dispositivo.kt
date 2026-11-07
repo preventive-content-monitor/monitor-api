@@ -21,7 +21,7 @@ class Dispositivo(
     val nomeDispositivo: String,
 
     @Column(name = "vinculado_em", nullable = false)
-    val vinculadoEm: Instant = Instant.now(),
+    var vinculadoEm: Instant = Instant.now(),
 
     @Column(name = "ultimo_acesso_em")
     var ultimoAcessoEm: Instant? = null,

@@ -62,7 +62,19 @@ class ServicoVinculacaoDispositivo(
             throw CodigoVinculacaoInvalidoExcecao("Código de vinculação inválido")
         }
 
-        val dispositivo = Dispositivo(
+        // Reinstalar a extensão no mesmo computador reaproveita o cadastro removido,
+        // para o painel não acumular um "computador" a cada reinstalação.
+        val reinstalado = dispositivoRepositorio.findAllByDependenteId(dependenteId)
+            .filter { it.removidoEm != null && it.nomeDispositivo == nomeDispositivo }
+            .maxByOrNull { it.removidoEm!! }
+
+        val dispositivo = reinstalado?.apply {
+            vinculadoEm = Instant.now()
+            removidoEm = null
+            ultimoSinalEm = null
+            versaoExtensao = null
+            anonimoPermitido = null
+        } ?: Dispositivo(
             dependente = dependente,
             nomeDispositivo = nomeDispositivo
         )
