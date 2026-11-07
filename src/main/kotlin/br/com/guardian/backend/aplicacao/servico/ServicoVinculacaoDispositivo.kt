@@ -45,7 +45,13 @@ class ServicoVinculacaoDispositivo(
         }
     }
 
-    fun vincularDispositivo(codigo: String, nomeDispositivo: String, usuarioId: UUID): Dispositivo {
+    fun vincularDispositivo(
+        codigo: String,
+        nomeDispositivo: String,
+        usuarioId: UUID,
+        computadorId: String? = null
+    ): Dispositivo {
+        val idComputador = computadorId?.trim()?.takeIf { ID_COMPUTADOR.matches(it) }
         val entrada = codigosVinculacao[codigo]
             ?: throw CodigoVinculacaoInvalidoExcecao("Código de vinculação inválido")
 
@@ -62,11 +68,13 @@ class ServicoVinculacaoDispositivo(
             throw CodigoVinculacaoInvalidoExcecao("Código de vinculação inválido")
         }
 
-        // Reinstalar a extensão no mesmo computador reaproveita o cadastro removido,
-        // para o painel não acumular um "computador" a cada reinstalação.
-        val reinstalado = dispositivoRepositorio.findAllByDependenteId(dependenteId)
-            .filter { it.removidoEm != null && it.nomeDispositivo == nomeDispositivo }
-            .maxByOrNull { it.removidoEm!! }
+        // Reinstalar a extensão no mesmo computador reaproveita o cadastro dele. A identificação
+        // é pelo computadorId (nunca pelo nome, que se repete entre PCs); sem ele, cria um novo.
+        val reinstalado = idComputador?.let { id ->
+            dispositivoRepositorio.findAllByDependenteId(dependenteId)
+                .filter { it.computadorId == id }
+                .maxByOrNull { it.vinculadoEm }
+        }
 
         val dispositivo = reinstalado?.apply {
             vinculadoEm = Instant.now()
@@ -76,7 +84,8 @@ class ServicoVinculacaoDispositivo(
             anonimoPermitido = null
         } ?: Dispositivo(
             dependente = dependente,
-            nomeDispositivo = nomeDispositivo
+            nomeDispositivo = nomeDispositivo,
+            computadorId = idComputador
         )
 
         val salvo = dispositivoRepositorio.save(dispositivo)
@@ -94,5 +103,9 @@ class ServicoVinculacaoDispositivo(
         )
 
         return salvo
+    }
+
+    private companion object {
+        val ID_COMPUTADOR = Regex("^[A-Za-z0-9-]{16,64}$")
     }
 }

@@ -39,5 +39,9 @@ class Dispositivo(
 
     /** Quando a extensão foi removida do navegador (detectado pela URL de desinstalação). */
     @Column(name = "removido_em")
-    var removidoEm: Instant? = null
+    var removidoEm: Instant? = null,
+
+    /** Identificador do computador/perfil do Chrome, mantido mesmo se a extensão for reinstalada. */
+    @Column(name = "computador_id", length = 64)
+    var computadorId: String? = null
 )

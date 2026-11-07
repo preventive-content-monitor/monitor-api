@@ -167,7 +167,8 @@ class DispositivoController(
         val dispositivo = servicoVinculacao.vincularDispositivo(
             requisicao.codigo.trim().lowercase(),
             requisicao.nomeDispositivo,
-            UUID.fromString(principal.subject)
+            UUID.fromString(principal.subject),
+            requisicao.computadorId
         )
         val token = geradorToken.gerarTokenDispositivo(dispositivo.id)
         servicoSessao.encerrar(principal)
